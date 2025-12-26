@@ -48,43 +48,51 @@ const App: React.FC = () => {
 
   /**
    * handleAction dipercepat dengan melakukan pembaruan state lokal seketika (Optimistic UI)
-   * sehingga pengguna tidak perlu menunggu round-trip database untuk melihat perubahan.
+   * dan kemudian memaksa refresh data dari cloud setelah aksi selesai untuk memastikan sinkronisasi.
    */
   const handleAction = async (action: string, payload: any) => {
     setIsSyncing(true);
     
     // 1. Update State Lokal Secara Instan (Optimistic)
+    // Memastikan NIS selalu string untuk perbandingan yang akurat
+    const normalizedPayload = { ...payload };
+    if (normalizedPayload.nis) normalizedPayload.nis = String(normalizedPayload.nis);
+
     switch(action) {
-      case 'ADD_STUDENT': setStudents(prev => [...prev, payload]); break;
-      case 'UPDATE_STUDENT': setStudents(prev => prev.map(s => s.nis === payload.nis ? payload : s)); break;
-      case 'DELETE_STUDENT': setStudents(prev => prev.filter(s => s.nis !== payload.nis)); break;
+      case 'ADD_STUDENT': setStudents(prev => [...prev, normalizedPayload]); break;
+      case 'UPDATE_STUDENT': setStudents(prev => prev.map(s => String(s.nis) === normalizedPayload.nis ? { ...s, ...normalizedPayload } : s)); break;
+      case 'DELETE_STUDENT': setStudents(prev => prev.filter(s => String(s.nis) !== normalizedPayload.nis)); break;
       
-      case 'ADD_SESSION': setSessions(prev => [...prev, payload]); break;
-      case 'UPDATE_SESSION': setSessions(prev => prev.map(s => s.id === payload.id ? payload : s)); break;
-      case 'DELETE_SESSION': setSessions(prev => prev.filter(s => s.id !== payload.id)); break;
+      case 'ADD_SESSION': setSessions(prev => [...prev, normalizedPayload]); break;
+      case 'UPDATE_SESSION': setSessions(prev => prev.map(s => s.id === normalizedPayload.id ? { ...s, ...normalizedPayload } : s)); break;
+      case 'DELETE_SESSION': setSessions(prev => prev.filter(s => s.id !== normalizedPayload.id)); break;
       
-      case 'ADD_ROOM': setRooms(prev => [...prev, payload]); break;
-      case 'UPDATE_ROOM': setRooms(prev => prev.map(r => r.id === payload.id ? payload : r)); break;
-      case 'DELETE_ROOM': setRooms(prev => prev.filter(r => r.id !== payload.id)); break;
+      case 'ADD_ROOM': setRooms(prev => [...prev, normalizedPayload]); break;
+      case 'UPDATE_ROOM': setRooms(prev => prev.map(r => r.id === normalizedPayload.id ? { ...r, ...normalizedPayload } : r)); break;
+      case 'DELETE_ROOM': setRooms(prev => prev.filter(r => r.id !== normalizedPayload.id)); break;
       
       case 'BULK_UPDATE_STUDENTS':
         setStudents(prev => prev.map(s => {
-          if (payload.selectedNis.includes(String(s.nis))) {
-            return { ...s, ...payload.updates };
+          if (normalizedPayload.selectedNis.includes(String(s.nis))) {
+            return { ...s, ...normalizedPayload.updates };
           }
           return s;
         }));
         break;
     }
 
-    // 2. Kirim ke Cloud di Latar Belakang
-    const success = await callCloudAction(GAS_URL, action, payload);
-    setIsSyncing(false);
-
-    if (!success) {
+    // 2. Kirim ke Cloud
+    const success = await callCloudAction(GAS_URL, action, normalizedPayload);
+    
+    // 3. Paksa refresh data dari database asli untuk sinkronisasi sempurna
+    if (success) {
+      await loadAllData();
+    } else {
       alert("Gagal sinkronisasi ke cloud. Perubahan mungkin tidak tersimpan permanen.");
-      loadAllData(); // Ambil data asli jika gagal
+      await loadAllData(); // Revert ke data cloud terakhir jika gagal
     }
+
+    setIsSyncing(false);
     return success;
   };
 

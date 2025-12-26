@@ -20,6 +20,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [showAddSession, setShowAddSession] = useState(false);
   const [sessionToEdit, setSessionToEdit] = useState<ExamSession | null>(null);
   const [sessionToDelete, setSessionToDelete] = useState<string | null>(null);
+  const [sessionToView, setSessionToView] = useState<ExamSession | null>(null);
 
   const [studentToEdit, setStudentToEdit] = useState<Student | null>(null);
   const [studentToAdd, setStudentToAdd] = useState(false);
@@ -61,6 +62,18 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
     }
   };
 
+  const handleDownloadTemplate = () => {
+    const headers = "NIS,NAMA_SISWA,KELAS_SISWA,RUANG_NAMA,PASSWORD,STATUS";
+    const sampleRow = "\n1234,NAMA SISWA CONTOH,7,RUANG 01,password123,BELUM_MASUK";
+    const blob = new Blob([headers + sampleRow], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'template_siswa_examsy.csv';
+    a.click();
+    window.URL.revokeObjectURL(url);
+  };
+
   const handleImportCSV = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -68,6 +81,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
     reader.onload = async (event) => {
       const text = event.target?.result as string;
       const lines = text.split('\n');
+      let count = 0;
       for (let i = 1; i < lines.length; i++) {
         const row = lines[i].split(',');
         if (row.length < 2) continue;
@@ -84,12 +98,29 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
             password: (pass || "password123").trim(),
             status: (stat || StudentStatus.BELUM_MASUK).trim()
           });
+          count++;
         }
       }
-      alert(`Import data siswa sinkron.`);
+      alert(`Berhasil mengimpor ${count} data siswa.`);
       if (fileInputRef.current) fileInputRef.current.value = '';
     };
     reader.readAsText(file);
+  };
+
+  const handleBulkUpdate = async () => {
+    const updates: any = {};
+    if (targetBulkRoomId !== 'KEEP') updates.roomId = targetBulkRoomId;
+    if (targetBulkStatus !== 'KEEP') updates.status = targetBulkStatus;
+
+    if (Object.keys(updates).length > 0) {
+      const ok = await onAction('BULK_UPDATE_STUDENTS', { selectedNis, updates });
+      if (ok) {
+        setShowBulkModal(false);
+        setSelectedNis([]);
+        setTargetBulkRoomId('KEEP');
+        setTargetBulkStatus('KEEP');
+      }
+    }
   };
 
   const getStatusBadge = (status: StudentStatus) => {
@@ -154,6 +185,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                      <span className="bg-slate-900 text-white text-[9px] font-black px-2 py-1 rounded-md uppercase tracking-wider">{session.durationMinutes} Menit</span>
                   </div>
                   <div className="flex items-center gap-2 pt-6 border-t border-slate-50">
+                    <button onClick={() => setSessionToView(session)} className="w-10 h-10 flex items-center justify-center bg-indigo-50 text-indigo-600 rounded-xl hover:bg-indigo-600 hover:text-white transition-all" title="Lihat Soal">
+                       <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268-2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                       </svg>
+                    </button>
                     <button onClick={() => setSessionToEdit(session)} className="flex-1 bg-slate-100 hover:bg-indigo-600 hover:text-white text-indigo-600 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all">EDIT</button>
                     <button onClick={() => setSessionToDelete(session.id)} className="w-10 h-10 flex items-center justify-center bg-red-50 text-red-500 rounded-xl hover:bg-red-600 hover:text-white transition-all">
                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
@@ -174,7 +211,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   <p className="text-slate-400 font-medium text-xs md:text-sm mt-2 uppercase tracking-widest">Database Terintegrasi ({students.length})</p>
                 </div>
                 <div className="flex flex-wrap gap-3">
-                  <input type="text" placeholder="Cari Nama/NIS..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full lg:w-64 pl-6 pr-6 py-3.5 bg-white border border-slate-200 rounded-2xl text-sm outline-none focus:border-indigo-500 shadow-sm" />
+                  <input type="text" placeholder="Cari Nama/NIS..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full lg:w-48 pl-6 pr-6 py-3.5 bg-white border border-slate-200 rounded-2xl text-sm outline-none focus:border-indigo-500 shadow-sm" />
                   <select value={roomFilter} onChange={(e) => setRoomFilter(e.target.value)} className="px-4 py-3.5 bg-white border border-slate-200 rounded-2xl text-[10px] font-black uppercase tracking-widest outline-none shadow-sm">
                     <option value="ALL">Semua Ruang</option>
                     <option value="">Tanpa Ruang</option>
@@ -182,9 +219,20 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   </select>
                   <button onClick={() => setStudentToAdd(true)} className="bg-indigo-600 text-white px-5 py-3.5 rounded-2xl font-black text-[10px] uppercase shadow-lg active:scale-95 transition-all"> + Siswa </button>
                   <button onClick={() => fileInputRef.current?.click()} className="bg-slate-900 text-white px-5 py-3.5 rounded-2xl font-black text-[10px] uppercase transition-all shadow-lg active:scale-95">Impor CSV</button>
+                  <button onClick={handleDownloadTemplate} className="bg-white text-slate-600 border border-slate-200 px-5 py-3.5 rounded-2xl font-black text-[10px] uppercase transition-all shadow-sm active:scale-95">Template CSV</button>
                   <input type="file" ref={fileInputRef} className="hidden" accept=".csv" onChange={handleImportCSV} />
                 </div>
              </div>
+
+             {selectedNis.length > 0 && (
+               <div className="mb-6 bg-indigo-600 text-white px-8 py-4 rounded-2xl flex items-center justify-between animate-in slide-in-from-top-4">
+                  <span className="text-xs font-black uppercase tracking-widest">{selectedNis.length} Siswa Terpilih</span>
+                  <div className="flex gap-4">
+                     <button onClick={() => setShowBulkModal(true)} className="bg-white text-indigo-600 px-6 py-2 rounded-xl font-black text-[10px] uppercase">Aksi Massal</button>
+                     <button onClick={() => setSelectedNis([])} className="text-white/70 font-black text-[10px] uppercase underline">Batal</button>
+                  </div>
+               </div>
+             )}
 
              <div className="bg-white rounded-[2rem] border border-slate-200 overflow-hidden shadow-sm">
                 <div className="overflow-x-auto">
@@ -213,11 +261,17 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                         <td className="px-8 py-5 font-black text-slate-800 tracking-tight uppercase text-xs">{student.name}</td>
                         <td className="px-8 py-5 text-[11px] font-bold text-slate-500 uppercase">Kls {student.class}</td>
                         <td className="px-8 py-5 text-[11px] font-black text-indigo-900 uppercase">{rooms.find(r => r.id === student.roomId)?.name || "-"}</td>
-                        <td className="px-8 py-5 font-mono text-[10px] text-slate-400 group-hover:text-slate-800 transition-colors uppercase">{student.password}</td>
+                        <td className="px-8 py-5 font-mono text-[11px] text-slate-500 group-hover:text-slate-800 transition-colors">{student.password}</td>
                         <td className="px-8 py-5 text-center">{getStatusBadge(student.status)}</td>
                         <td className="px-8 py-5 text-right pr-12">
-                          <button onClick={() => setStudentToEdit(student)} className="text-indigo-600 font-black text-[9px] uppercase tracking-widest hover:bg-indigo-50 px-3 py-1.5 rounded-lg transition-all">EDIT</button>
-                          <button onClick={async () => { if(confirm('Hapus siswa ini?')) await onAction('DELETE_STUDENT', { nis: student.nis }); }} className="text-red-400 font-black text-[9px] uppercase tracking-widest hover:bg-red-50 px-3 py-1.5 rounded-lg ml-2 transition-all">HAPUS</button>
+                          <div className="flex justify-end gap-2">
+                             <button onClick={() => setStudentToEdit(student)} title="Edit" className="p-2 bg-indigo-50 text-indigo-600 rounded-lg hover:bg-indigo-600 hover:text-white transition-all">
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                             </button>
+                             <button onClick={async () => { if(confirm('Hapus siswa ini?')) await onAction('DELETE_STUDENT', { nis: student.nis }); }} title="Hapus" className="p-2 bg-red-50 text-red-400 rounded-lg hover:bg-red-600 hover:text-white transition-all">
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                             </button>
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -251,7 +305,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     <div className="flex justify-between items-center pt-4 border-t border-slate-50">
                       <button onClick={() => setRoomToEdit(room)} className="text-indigo-600 font-black text-[10px] uppercase tracking-widest hover:underline">Edit Detail</button>
                       <button onClick={() => setRoomToDelete(room.id)} className="text-red-400 hover:text-red-600 transition-colors">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                       </button>
                     </div>
                   </div>
@@ -262,9 +316,81 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
       </main>
 
       {/* MODALS */}
+      {sessionToView && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
+          <div className="bg-white w-full max-w-6xl h-[90vh] flex flex-col rounded-[2.5rem] shadow-2xl animate-in zoom-in-95 overflow-hidden">
+            <div className="flex justify-between items-center px-10 py-6 border-b border-slate-100 shrink-0">
+               <div>
+                  <h3 className="text-2xl font-black text-slate-900 uppercase tracking-tighter leading-none">{sessionToView.name}</h3>
+                  <div className="flex gap-4 mt-2">
+                    <span className="text-slate-400 text-[10px] font-black uppercase tracking-widest">Kls {sessionToView.class}</span>
+                    <span className="text-indigo-600 text-[10px] font-black uppercase tracking-widest">PIN: {sessionToView.pin}</span>
+                    <span className="text-slate-900 text-[10px] font-black uppercase tracking-widest">{sessionToView.durationMinutes} Menit</span>
+                  </div>
+               </div>
+               <div className="flex items-center gap-4">
+                  {sessionToView.pdfUrl && (
+                    <a href={sessionToView.pdfUrl} target="_blank" rel="noopener noreferrer" className="bg-indigo-50 text-indigo-600 px-5 py-2.5 rounded-xl text-[10px] font-black uppercase hover:bg-indigo-600 hover:text-white transition-all">Buka di Tab Baru</a>
+                  )}
+                  <button onClick={() => setSessionToView(null)} className="p-2 text-slate-400 hover:text-red-500 transition-colors">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                  </button>
+               </div>
+            </div>
+            
+            <div className="flex-1 bg-slate-100 relative">
+               {sessionToView.pdfUrl ? (
+                 <iframe 
+                   src={`${sessionToView.pdfUrl}#toolbar=0&navpanes=0`} 
+                   className="w-full h-full border-none"
+                   title="PDF Preview"
+                 />
+               ) : (
+                 <div className="absolute inset-0 flex items-center justify-center text-slate-400 font-black uppercase tracking-widest text-xs">
+                   Tidak ada link PDF soal tersedia
+                 </div>
+               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showBulkModal && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
+          <div className="bg-white w-full max-w-sm p-10 rounded-[3rem] shadow-2xl animate-in zoom-in-95">
+            <h3 className="text-2xl font-black text-slate-900 mb-2 uppercase tracking-tighter leading-none">Aksi Massal</h3>
+            <p className="text-slate-400 text-[10px] font-black uppercase mb-8">{selectedNis.length} Siswa Terpilih</p>
+            
+            <div className="space-y-6">
+               <div className="space-y-1.5">
+                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Pindahkan ke Ruang</label>
+                  <select value={targetBulkRoomId} onChange={e => setTargetBulkRoomId(e.target.value)} className="w-full px-5 py-3.5 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-bold outline-none">
+                     <option value="KEEP">Jangan Ubah Ruang</option>
+                     <option value="">Hapus dari Ruang</option>
+                     {rooms.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
+                  </select>
+               </div>
+               
+               <div className="space-y-1.5">
+                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Ubah Status Menjadi</label>
+                  <select value={targetBulkStatus} onChange={e => setTargetBulkStatus(e.target.value)} className="w-full px-5 py-3.5 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-bold outline-none">
+                     <option value="KEEP">Jangan Ubah Status</option>
+                     {Object.values(StudentStatus).map(s => <option key={s} value={s}>{s.replace('_', ' ')}</option>)}
+                  </select>
+               </div>
+               
+               <div className="pt-6 flex flex-col gap-2">
+                  <button onClick={handleBulkUpdate} className="w-full bg-indigo-600 text-white py-4 rounded-2xl font-black uppercase text-xs tracking-widest shadow-lg">TERAPKAN PERUBAHAN</button>
+                  <button onClick={() => setShowBulkModal(false)} className="w-full text-slate-400 py-2 font-bold uppercase text-[10px]">Batal</button>
+               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {(studentToEdit || studentToAdd) && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
-          <div className="bg-white w-full max-w-lg p-10 rounded-[3rem] shadow-2xl animate-in zoom-in-95">
+          <div className="bg-white w-full max-w-xl p-10 rounded-[3rem] shadow-2xl animate-in zoom-in-95">
             <h3 className="text-2xl font-black text-slate-900 mb-8 uppercase tracking-tighter leading-none">{studentToEdit ? 'Ubah Siswa' : 'Tambah Siswa'}</h3>
             <form onSubmit={async (e) => {
               e.preventDefault();
@@ -275,26 +401,49 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 class: f.get('class') as string,
                 roomId: f.get('roomId') as string,
                 password: ((f.get('password') as string) || "password123").trim(),
-                status: studentToEdit ? studentToEdit.status : StudentStatus.BELUM_MASUK
+                status: f.get('status') as StudentStatus
               };
               const ok = await onAction(studentToEdit ? 'UPDATE_STUDENT' : 'ADD_STUDENT', data);
               if(ok) { setStudentToEdit(null); setStudentToAdd(false); }
             }} className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
-                <input name="nis" defaultValue={studentToEdit?.nis} readOnly={!!studentToEdit} required placeholder="NIS" className="w-full px-5 py-3.5 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-bold uppercase outline-none focus:border-indigo-500" />
-                <input name="password" defaultValue={studentToEdit?.password || 'password123'} required placeholder="PASSWORD" className="w-full px-5 py-3.5 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-bold outline-none focus:border-indigo-500" />
+                <div className="space-y-1.5">
+                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">NIS</label>
+                  <input name="nis" defaultValue={studentToEdit?.nis} readOnly={!!studentToEdit} required placeholder="NIS" className="w-full px-5 py-3.5 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-bold uppercase outline-none focus:border-indigo-500" />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Password</label>
+                  <input name="password" defaultValue={studentToEdit?.password || 'password123'} required placeholder="PASSWORD" className="w-full px-5 py-3.5 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-bold outline-none focus:border-indigo-500" />
+                </div>
               </div>
-              <input name="name" defaultValue={studentToEdit?.name} required placeholder="NAMA LENGKAP SISWA" className="w-full px-5 py-3.5 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-bold outline-none focus:border-indigo-500 uppercase" />
-              <div className="grid grid-cols-2 gap-4">
-                <select name="class" defaultValue={studentToEdit?.class || '7'} className="w-full px-5 py-3.5 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-bold outline-none focus:border-indigo-500">
-                    <option value="7">Kls 7</option>
-                    <option value="8">Kls 8</option>
-                    <option value="9">Kls 9</option>
-                </select>
-                <select name="roomId" defaultValue={studentToEdit?.roomId || ''} className="w-full px-5 py-3.5 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-bold outline-none focus:border-indigo-500">
-                    <option value="">Ruang: Kosong</option>
-                    {rooms.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
-                </select>
+              <div className="space-y-1.5">
+                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Nama Lengkap</label>
+                <input name="name" defaultValue={studentToEdit?.name} required placeholder="NAMA LENGKAP SISWA" className="w-full px-5 py-3.5 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-bold outline-none focus:border-indigo-500 uppercase" />
+              </div>
+              <div className="grid grid-cols-3 gap-3">
+                <div className="space-y-1.5">
+                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Kelas</label>
+                  <select name="class" defaultValue={studentToEdit?.class || '7'} className="w-full px-4 py-3.5 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-bold outline-none focus:border-indigo-500">
+                      <option value="7">Kls 7</option>
+                      <option value="8">Kls 8</option>
+                      <option value="9">Kls 9</option>
+                  </select>
+                </div>
+                <div className="space-y-1.5">
+                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Ruang</label>
+                  <select name="roomId" defaultValue={studentToEdit?.roomId || ''} className="w-full px-4 py-3.5 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-bold outline-none focus:border-indigo-500">
+                      <option value="">Kosong</option>
+                      {rooms.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
+                  </select>
+                </div>
+                <div className="space-y-1.5">
+                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Status</label>
+                  <select name="status" defaultValue={studentToEdit?.status || StudentStatus.BELUM_MASUK} className="w-full px-4 py-3.5 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-bold outline-none focus:border-indigo-500">
+                      {Object.values(StudentStatus).map(s => (
+                        <option key={s} value={s}>{s.replace('_', ' ')}</option>
+                      ))}
+                  </select>
+                </div>
               </div>
               <div className="pt-6 flex flex-col gap-2">
                  <button type="submit" className="w-full bg-indigo-600 text-white py-4 rounded-2xl font-black uppercase text-xs tracking-widest shadow-lg">SIMPAN DATA</button>
@@ -344,7 +493,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
       {(showAddRoom || roomToEdit) && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
-          <div className="bg-white w-full max-w-md p-10 rounded-[3rem] shadow-2xl animate-in zoom-in-95">
+          <div className="bg-white w-full max-md:max-w-md p-10 rounded-[3rem] shadow-2xl animate-in zoom-in-95">
             <h3 className="text-2xl font-black text-slate-900 mb-8 uppercase tracking-tighter leading-none">{roomToEdit ? 'Ubah Ruang' : 'Ruang Baru'}</h3>
             <form onSubmit={async (e) => {
               e.preventDefault();
