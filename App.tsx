@@ -6,10 +6,9 @@ import AdminLogin from './views/AdminLogin';
 import AdminDashboard from './views/AdminDashboard';
 import ProctorDashboard from './views/ProctorDashboard';
 import ExamRoom from './views/ExamRoom';
-import { fetchFromCloud, syncToCloud } from './services/databaseService';
+import { fetchFromCloud, callCloudAction } from './services/databaseService';
 
-// PASTIKAN URL INI ADALAH URL "WEB APP" YANG SUDAH DI-DEPLOY (Bukan URL Editor)
-const GAS_URL = "https://script.google.com/macros/s/AKfycbwVzh9w1AcyfXefqRD0A-JUJ_zf9pyTi8EuTbVT572XTjggL5U7TRtCV0VMcGjxF1MEhA/exec"; 
+const GAS_URL = "https://script.google.com/macros/s/AKfycbxJbQdOa7nhOpKlBwcdjpOCpEdcN4YFjUaCTS376dUS1ttJZe6Ii9AS3z5ECfTKuVf7ig/exec"; 
 
 const App: React.FC = () => {
   const [view, setView] = useState<ViewState>('STUDENT_LOGIN');
@@ -17,107 +16,125 @@ const App: React.FC = () => {
   const [currentSession, setCurrentSession] = useState<ExamSession | null>(null);
   const [activeRoom, setActiveRoom] = useState<Room | null>(null);
   
-  // Status Database & Sync
   const [isLoading, setIsLoading] = useState(true);
-  const [isDatabaseReady, setIsDatabaseReady] = useState(false); 
   const [isSyncing, setIsSyncing] = useState(false);
 
   const [students, setStudents] = useState<Student[]>([]);
   const [sessions, setSessions] = useState<ExamSession[]>([]);
   const [rooms, setRooms] = useState<Room[]>([]);
 
-  const lastCloudHash = useRef<string>("");
-
-  const normalizeData = (data: any) => {
-    if (!data || typeof data !== 'object') return null;
-    const rawStudents = data.students || data.STUDENTS || [];
-    const rawSessions = data.sessions || data.SESSIONS || [];
-    const rawRooms = data.rooms || data.ROOMS || [];
-
-    return {
-      students: rawStudents.map((s: any) => ({
-        nis: String(s.nis || s.NIS || '').trim(),
-        name: String(s.name || s.Nama || ''),
-        class: String(s.class || s.Kelas || ''),
-        password: String(s.password || 'password123'),
-        status: (String(s.status || s.Status || StudentStatus.BELUM_MASUK).trim()) as StudentStatus,
-        roomId: String(s.roomId || s.ruangId || '').trim()
-      })),
-      sessions: rawSessions.map((sess: any) => ({
-        id: String(sess.id || ''),
-        name: String(sess.name || ''),
-        class: String(sess.class || ''),
-        pin: String(sess.pin || ''),
-        durationMinutes: Number(sess.durationMinutes || 60),
-        isActive: sess.isActive === true || sess.isActive === 'TRUE',
-        questions: [],
-        pdfUrl: String(sess.pdfUrl || '')
-      })),
-      rooms: rawRooms.map((r: any) => ({
-        id: String(r.id || '').trim(),
-        name: String(r.name || '').toUpperCase(),
-        capacity: Number(r.capacity || 0),
-        username: String(r.username || ''),
-        password: String(r.password || '')
-      }))
-    };
+  const loadAllData = async () => {
+    if (!GAS_URL) return;
+    const cloudData = await fetchFromCloud(GAS_URL);
+    if (cloudData) {
+      setStudents(cloudData.students || []);
+      setSessions(cloudData.sessions || []);
+      setRooms(cloudData.rooms || []);
+      localStorage.setItem('examsy_backup', JSON.stringify(cloudData));
+    }
+    setIsLoading(false);
   };
 
   useEffect(() => {
-    const initApp = async () => {
-      setIsLoading(true);
-      if (GAS_URL) {
-        const cloudData = await fetchFromCloud(GAS_URL);
-        const normalized = normalizeData(cloudData);
-        if (normalized) {
-          setStudents(normalized.students);
-          setSessions(normalized.sessions);
-          setRooms(normalized.rooms);
-          lastCloudHash.current = JSON.stringify(normalized);
-          setIsDatabaseReady(true);
-        } else {
-          setIsDatabaseReady(true);
-        }
+    loadAllData();
+    // Refresh otomatis setiap 60 detik untuk sinkronisasi latar belakang
+    const interval = setInterval(() => {
+      if (view === 'ADMIN_DASHBOARD' || view === 'PROCTOR_DASHBOARD') {
+        loadAllData();
       }
-      setIsLoading(false);
-    };
-    initApp();
-  }, []);
+    }, 60000);
+    return () => clearInterval(interval);
+  }, [view]);
 
-  // Sync Otomatis hanya di Dashboard Admin
-  useEffect(() => {
-    if (!isDatabaseReady || view !== 'ADMIN_DASHBOARD' || isSyncing) return;
+  /**
+   * handleAction dipercepat dengan melakukan pembaruan state lokal seketika (Optimistic UI)
+   * sehingga pengguna tidak perlu menunggu round-trip database untuk melihat perubahan.
+   */
+  const handleAction = async (action: string, payload: any) => {
+    setIsSyncing(true);
+    
+    // 1. Update State Lokal Secara Instan (Optimistic)
+    switch(action) {
+      case 'ADD_STUDENT': setStudents(prev => [...prev, payload]); break;
+      case 'UPDATE_STUDENT': setStudents(prev => prev.map(s => s.nis === payload.nis ? payload : s)); break;
+      case 'DELETE_STUDENT': setStudents(prev => prev.filter(s => s.nis !== payload.nis)); break;
+      
+      case 'ADD_SESSION': setSessions(prev => [...prev, payload]); break;
+      case 'UPDATE_SESSION': setSessions(prev => prev.map(s => s.id === payload.id ? payload : s)); break;
+      case 'DELETE_SESSION': setSessions(prev => prev.filter(s => s.id !== payload.id)); break;
+      
+      case 'ADD_ROOM': setRooms(prev => [...prev, payload]); break;
+      case 'UPDATE_ROOM': setRooms(prev => prev.map(r => r.id === payload.id ? payload : r)); break;
+      case 'DELETE_ROOM': setRooms(prev => prev.filter(r => r.id !== payload.id)); break;
+      
+      case 'BULK_UPDATE_STUDENTS':
+        setStudents(prev => prev.map(s => {
+          if (payload.selectedNis.includes(String(s.nis))) {
+            return { ...s, ...payload.updates };
+          }
+          return s;
+        }));
+        break;
+    }
 
-    const currentData = { students, sessions, rooms };
-    const currentHash = JSON.stringify(currentData);
+    // 2. Kirim ke Cloud di Latar Belakang
+    const success = await callCloudAction(GAS_URL, action, payload);
+    setIsSyncing(false);
 
-    if (currentHash === lastCloudHash.current) return;
-    if (students.length === 0 && JSON.parse(lastCloudHash.current || "{}").students?.length > 0) return;
+    if (!success) {
+      alert("Gagal sinkronisasi ke cloud. Perubahan mungkin tidak tersimpan permanen.");
+      loadAllData(); // Ambil data asli jika gagal
+    }
+    return success;
+  };
 
-    const timer = setTimeout(async () => {
-      setIsSyncing(true);
-      const success = await syncToCloud(GAS_URL, currentData);
-      if (success) lastCloudHash.current = currentHash;
-      setIsSyncing(false);
-    }, 4000);
-
-    return () => clearTimeout(timer);
-  }, [students, sessions, rooms, isDatabaseReady, view]);
-
-  const handleStudentLogin = (student: Student, session: ExamSession) => {
+  const handleStudentLogin = async (student: Student, session: ExamSession) => {
     setCurrentUser(student);
     setCurrentSession(session);
-    setStudents(prev => prev.map(s => s.nis === student.nis ? { ...s, status: StudentStatus.SEDANG_UJIAN } : s));
+    await handleAction('UPDATE_STUDENT', { ...student, status: StudentStatus.SEDANG_UJIAN });
     setView('EXAM_ROOM');
   };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-10 text-center">
+        <div className="w-16 h-16 border-4 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin mb-6"></div>
+        <h2 className="text-white font-black uppercase tracking-widest text-sm">Menghubungkan ke Database...</h2>
+      </div>
+    );
+  }
 
   const renderView = () => {
     switch (view) {
       case 'STUDENT_LOGIN': return <StudentLogin sessions={sessions} students={students} onLogin={handleStudentLogin} onAdminClick={() => setView('ADMIN_LOGIN')} />;
       case 'ADMIN_LOGIN': return <AdminLogin rooms={rooms} onLogin={(role, r) => { if(role==='ADMIN') setView('ADMIN_DASHBOARD'); else { setActiveRoom(r!); setView('PROCTOR_DASHBOARD'); } }} onBack={() => setView('STUDENT_LOGIN')} />;
-      case 'ADMIN_DASHBOARD': return <AdminDashboard sessions={sessions} setSessions={setSessions} students={students} setStudents={setStudents} rooms={rooms} setRooms={setRooms} isSyncing={isSyncing} onLogout={() => setView('STUDENT_LOGIN')} />;
-      case 'PROCTOR_DASHBOARD': return activeRoom ? <ProctorDashboard gasUrl={GAS_URL} room={activeRoom} students={students} setStudents={setStudents} isSyncing={isSyncing} onLogout={() => setView('STUDENT_LOGIN')} /> : null;
-      case 'EXAM_ROOM': return currentUser && currentSession ? <ExamRoom student={currentUser} session={currentSession} onFinish={() => setView('STUDENT_LOGIN')} /> : null;
+      case 'ADMIN_DASHBOARD': 
+        return <AdminDashboard 
+          sessions={sessions} 
+          students={students} 
+          rooms={rooms} 
+          isSyncing={isSyncing} 
+          onLogout={() => setView('STUDENT_LOGIN')} 
+          onAction={handleAction}
+        />;
+      case 'PROCTOR_DASHBOARD': 
+        return activeRoom ? <ProctorDashboard 
+          gasUrl={GAS_URL} 
+          room={activeRoom} 
+          students={students} 
+          isSyncing={isSyncing} 
+          onLogout={() => setView('STUDENT_LOGIN')} 
+          onAction={handleAction}
+        /> : null;
+      case 'EXAM_ROOM': 
+        return currentUser && currentSession ? <ExamRoom 
+          student={currentUser} 
+          session={currentSession} 
+          onFinish={async () => {
+            await handleAction('UPDATE_STUDENT', { ...currentUser, status: StudentStatus.SELESAI });
+            setView('STUDENT_LOGIN');
+          }} 
+        /> : null;
       default: return null;
     }
   };

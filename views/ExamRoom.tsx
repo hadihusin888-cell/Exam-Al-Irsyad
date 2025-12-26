@@ -17,15 +17,12 @@ const ExamRoom: React.FC<ExamRoomProps> = ({ student, session, onFinish }) => {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [deviceType, setDeviceType] = useState<'iOS' | 'Android' | 'Desktop'>('Desktop');
   const [zoomLevel, setZoomLevel] = useState(1);
-  const [controlsOpacity, setControlsOpacity] = useState(1);
   const [iframeKey, setIframeKey] = useState(0); 
-  const [showIOSGuide, setShowIOSGuide] = useState(false);
   const [cameraError, setCameraError] = useState<string | null>(null);
   
   const mainRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const wakeLockRef = useRef<any>(null);
-  const opacityTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   
   const MAX_VIOLATIONS = 3;
   const lastViolationTime = useRef(0);
@@ -34,7 +31,6 @@ const ExamRoom: React.FC<ExamRoomProps> = ({ student, session, onFinish }) => {
     const ua = navigator.userAgent;
     if (/iPad|iPhone|iPod/.test(ua)) {
       setDeviceType('iOS');
-      setShowIOSGuide(true);
     } else if (/Android/.test(ua)) {
       setDeviceType('Android');
     } else {
@@ -44,7 +40,6 @@ const ExamRoom: React.FC<ExamRoomProps> = ({ student, session, onFinish }) => {
     const handleFsChange = () => {
       const fs = !!document.fullscreenElement;
       setIsFullscreen(fs);
-      // Jika sedang ujian dan keluar fullscreen, anggap sebagai gangguan fokus
       if (hasConsented && !fs && deviceType !== 'iOS') {
         triggerViolation("Exit Fullscreen");
       }
@@ -52,8 +47,6 @@ const ExamRoom: React.FC<ExamRoomProps> = ({ student, session, onFinish }) => {
 
     document.addEventListener('fullscreenchange', handleFsChange);
     document.addEventListener('webkitfullscreenchange', handleFsChange);
-    document.addEventListener('mozfullscreenchange', handleFsChange);
-    document.addEventListener('MSFullscreenChange', handleFsChange);
 
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
       if (hasConsented) {
@@ -64,13 +57,19 @@ const ExamRoom: React.FC<ExamRoomProps> = ({ student, session, onFinish }) => {
     };
     window.addEventListener('beforeunload', handleBeforeUnload);
 
+    const timer = setInterval(() => {
+      if (hasConsented && timeLeft > 0) {
+        setTimeLeft(prev => prev - 1);
+      }
+    }, 1000);
+
     return () => {
       document.removeEventListener('fullscreenchange', handleFsChange);
-      document.removeEventListener('webkitfullscreenchange', handleFsChange);
       window.removeEventListener('beforeunload', handleBeforeUnload);
+      clearInterval(timer);
       releaseWakeLock();
     };
-  }, [hasConsented, deviceType]);
+  }, [hasConsented, timeLeft, deviceType]);
 
   const requestWakeLock = async () => {
     try {
@@ -96,8 +95,6 @@ const ExamRoom: React.FC<ExamRoomProps> = ({ student, session, onFinish }) => {
         await elem.requestFullscreen();
       } else if ((elem as any).webkitRequestFullscreen) {
         await (elem as any).webkitRequestFullscreen();
-      } else if ((elem as any).msRequestFullscreen) {
-        await (elem as any).msRequestFullscreen();
       }
     } catch (err) {
       console.error("Fullscreen error:", err);
@@ -121,11 +118,7 @@ const ExamRoom: React.FC<ExamRoomProps> = ({ student, session, onFinish }) => {
           }
         }
       }
-      
-      if (deviceType !== 'iOS') {
-        await enterFullscreen();
-      }
-      
+      if (deviceType !== 'iOS') await enterFullscreen();
       await requestWakeLock();
       setHasConsented(true);
     } catch (err) {
@@ -139,14 +132,12 @@ const ExamRoom: React.FC<ExamRoomProps> = ({ student, session, onFinish }) => {
     lastViolationTime.current = now;
     setIsFocusLost(true);
     setViolations(v => v + 1);
-    if (navigator.clipboard) navigator.clipboard.writeText("").catch(() => {});
   };
 
   useEffect(() => {
     if (!hasConsented) return;
     const handleVisibilityChange = () => { if (document.hidden) triggerViolation("App Switched"); };
     const handleBlur = () => triggerViolation("Window Blur");
-    
     window.addEventListener('visibilitychange', handleVisibilityChange);
     window.addEventListener('blur', handleBlur);
     return () => {
@@ -177,7 +168,7 @@ const ExamRoom: React.FC<ExamRoomProps> = ({ student, session, onFinish }) => {
     <div className={`flex flex-col h-screen w-screen overflow-hidden select-none font-sans relative ${isIOS ? 'bg-black' : 'bg-slate-950'}`}>
       <video ref={videoRef} className="hidden" aria-hidden="true" muted playsInline />
 
-      {/* FULLSCREEN ENFORCER OVERLAY (Android & Desktop) */}
+      {/* FULLSCREEN ENFORCER OVERLAY */}
       {hasConsented && !isFullscreen && !isIOS && (
         <div className="fixed inset-0 z-[9999] bg-slate-950 flex flex-col items-center justify-center p-8 text-center backdrop-blur-3xl">
            <div className="bg-white p-10 rounded-[3rem] shadow-2xl max-w-sm w-full">
@@ -188,27 +179,12 @@ const ExamRoom: React.FC<ExamRoomProps> = ({ student, session, onFinish }) => {
               </div>
               <h2 className="text-xl font-black text-slate-900 mb-2 uppercase tracking-tighter">MODE AMAN KELUAR</h2>
               <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest mb-8 leading-relaxed">Sistem mendeteksi Anda keluar dari mode Fullscreen. Soal disembunyikan untuk keamanan.</p>
-              <button 
-                onClick={enterFullscreen}
-                className="w-full bg-indigo-600 text-white py-5 rounded-2xl font-black text-xs uppercase tracking-[0.2em] shadow-xl shadow-indigo-100 active:scale-95 transition-all"
-              >
-                KEMBALI KE FULLSCREEN
-              </button>
+              <button onClick={enterFullscreen} className="w-full bg-indigo-600 text-white py-5 rounded-2xl font-black text-xs uppercase tracking-[0.2em] shadow-xl shadow-indigo-100 active:scale-95 transition-all">KEMBALI KE FULLSCREEN</button>
            </div>
         </div>
       )}
 
-      {/* OVERLAYS LAINNYA */}
-      {cameraError === 'PERMISSION_DENIED' && (
-        <div className="fixed inset-0 z-[8000] bg-white flex items-center justify-center p-8 text-center">
-          <div className="max-w-sm">
-            <h2 className="text-2xl font-black text-slate-900 mb-4 uppercase tracking-tighter">KAMERA DIBLOKIR</h2>
-            <p className="mb-8 text-slate-500 text-sm">Ujian memerlukan izin kamera. Silakan izinkan melalui pengaturan browser lalu muat ulang halaman.</p>
-            <button onClick={() => window.location.reload()} className="w-full bg-indigo-600 text-white py-5 rounded-2xl font-black text-xs uppercase tracking-widest">MUAT ULANG</button>
-          </div>
-        </div>
-      )}
-
+      {/* OVERLAYS */}
       {!hasConsented && (
         <div className="fixed inset-0 z-[1000] bg-slate-950 flex items-center justify-center p-6 backdrop-blur-md">
           <div className="bg-white w-full max-w-sm p-10 rounded-[3.5rem] text-center shadow-2xl border border-slate-100">
@@ -269,19 +245,51 @@ const ExamRoom: React.FC<ExamRoomProps> = ({ student, session, onFinish }) => {
         </div>
       )}
 
-      {/* MODALS */}
+      {/* MODERN FINISH CONFIRMATION MODAL */}
       {showConfirm && (
-        <div className="fixed inset-0 z-[1000] flex items-center justify-center p-6 bg-slate-950/95 backdrop-blur-sm">
-          <div className="bg-white w-full max-w-xs p-10 rounded-[2.5rem] text-center shadow-2xl">
-            <h3 className="text-xl font-black text-slate-900 mb-4 uppercase">KUMPULKAN?</h3>
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-6 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-300">
+          <div className="bg-white w-full max-w-md p-10 rounded-[3.5rem] shadow-2xl border border-slate-100 text-center animate-in zoom-in-95 slide-in-from-bottom-10 duration-500">
+            <div className="w-24 h-24 bg-indigo-50 text-indigo-600 rounded-[2rem] flex items-center justify-center mx-auto mb-8 shadow-inner">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            
+            <h3 className="text-2xl font-black text-slate-900 mb-2 uppercase tracking-tight">Selesaikan Ujian?</h3>
+            <p className="text-slate-500 text-sm mb-10 leading-relaxed">
+              Pastikan semua jawaban telah terisi dengan benar. Setelah mengirim, Anda <span className="text-red-600 font-bold">tidak dapat kembali</span> ke halaman soal ini lagi.
+            </p>
+
+            <div className="space-y-4 mb-10">
+              <div className="flex items-center gap-4 bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                <div className="w-6 h-6 bg-indigo-600 rounded-full flex items-center justify-center text-white text-[10px] font-black">1</div>
+                <p className="text-xs font-bold text-slate-600 text-left">Jawaban sudah diperiksa ulang</p>
+              </div>
+              <div className="flex items-center gap-4 bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                <div className="w-6 h-6 bg-indigo-600 rounded-full flex items-center justify-center text-white text-[10px] font-black">2</div>
+                <p className="text-xs font-bold text-slate-600 text-left">Koneksi internet stabil (disarankan)</p>
+              </div>
+            </div>
+
             <div className="flex flex-col gap-3">
-              <button onClick={handleFinalFinish} className="w-full bg-emerald-500 text-white font-black py-4 rounded-xl text-[10px] uppercase tracking-widest">YA, KIRIM</button>
-              <button onClick={() => setShowConfirm(false)} className="w-full bg-slate-100 text-slate-400 font-bold py-4 rounded-xl text-[10px] uppercase tracking-widest">BATAL</button>
+              <button 
+                onClick={handleFinalFinish} 
+                className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-black py-5 rounded-2xl text-[12px] uppercase tracking-[0.2em] shadow-xl shadow-indigo-100 transition-all active:scale-[0.97]"
+              >
+                YA, KIRIM JAWABAN
+              </button>
+              <button 
+                onClick={() => setShowConfirm(false)} 
+                className="w-full bg-white hover:bg-slate-50 text-slate-400 font-bold py-4 rounded-2xl text-[10px] uppercase tracking-widest transition-all"
+              >
+                MASIH INGIN MENGECEK
+              </button>
             </div>
           </div>
         </div>
       )}
 
+      {/* VIOLATION MODAL */}
       {isFocusLost && hasConsented && (
         <div className="fixed inset-0 z-[5000] bg-slate-950/90 flex items-center justify-center p-8 backdrop-blur-3xl">
           <div className="bg-white w-full max-w-sm p-10 rounded-[2.5rem] text-center shadow-2xl">
@@ -313,13 +321,6 @@ const ExamRoom: React.FC<ExamRoomProps> = ({ student, session, onFinish }) => {
            .timer-box { font-size: 1.5rem; padding: 0.75rem 1.5rem; }
            .finish-btn { font-size: 0.875rem; padding: 0.875rem 2.5rem; }
            .refresh-btn { width: 3.5rem; height: 3.5rem; }
-        }
-        @media (max-height: 480px) and (orientation: landscape) {
-           .exam-header { height: 2.2rem !important; padding-left: 0.5rem !important; padding-right: 0.5rem !important; }
-           .exam-title { font-size: 10px !important; }
-           .student-name { font-size: 9px !important; }
-           .student-info { font-size: 7px !important; }
-           .timer-box, .finish-btn, .refresh-btn { height: 1.6rem !important; font-size: 8px !important; }
         }
       `}</style>
     </div>

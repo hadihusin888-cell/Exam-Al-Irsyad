@@ -10,7 +10,6 @@ interface StudentLoginProps {
 }
 
 const StudentLogin: React.FC<StudentLoginProps> = ({ sessions, students, onLogin, onAdminClick }) => {
-  // GANTI LINK DIBAWAH INI UNTUK MENGUBAH LOGO
   const LOGO_URL = "https://www.alirsyad.or.id/wp-content/uploads/download/alirsyad-alislamiyyah-bw.png"; 
   
   const [formData, setFormData] = useState({
@@ -26,45 +25,57 @@ const StudentLogin: React.FC<StudentLoginProps> = ({ sessions, students, onLogin
     e.preventDefault();
     setError('');
 
-    // Mencari siswa dengan NIS dan Password yang cocok (Sinkronisasi dengan database lokal/cloud)
+    const inputNis = String(formData.nis).trim();
+    const inputPass = String(formData.password).trim();
+    const inputClass = String(formData.studentClass).trim();
+    const inputPin = String(formData.pin).trim().toUpperCase();
+
+    // 1. Cari Siswa berdasarkan NIS & Password
     const student = students.find(s => 
-      String(s.nis).trim() === String(formData.nis).trim() && 
-      s.password === formData.password
+      String(s.nis).trim() === inputNis && 
+      String(s.password || '').trim() === inputPass
     );
     
     if (!student) {
-      setError('NIS atau Password salah.');
+      setError('NIS atau Password Anda tidak terdaftar.');
       return;
     }
 
+    // 2. Cek Status Akun
     if (student.status === StudentStatus.BLOKIR) {
-      setError('Akun Anda telah DIBLOKIR. Silakan hubungi admin.');
+      setError('Akses ditolak. Akun Anda dalam status BLOKIR.');
       return;
     }
 
     if (student.status === StudentStatus.SELESAI) {
-      setError('Anda sudah menyelesaikan ujian ini.');
+      setError('Anda telah menyelesaikan sesi ujian ini.');
       return;
     }
 
-    if (String(student.class) !== String(formData.studentClass)) {
-      setError(`Data Anda terdaftar di Kelas ${student.class}. Silakan pilih kelas yang benar.`);
+    // 3. Sinkronisasi Data Kelas Siswa
+    if (String(student.class).trim() !== inputClass) {
+      setError(`Sinkronisasi Gagal: Anda terdaftar di Kelas ${student.class}, bukan Kelas ${inputClass}.`);
       return;
     }
 
-    // Fix: Ensure pin is treated as a string before calling toLowerCase
-    const session = sessions.find(s => String(s.pin || '').toLowerCase() === formData.pin.toLowerCase() && s.isActive);
+    // 4. Cari Sesi Aktif berdasarkan PIN
+    const session = sessions.find(s => 
+      String(s.pin || '').trim().toUpperCase() === inputPin && 
+      s.isActive
+    );
     
     if (!session) {
       setError('PIN Sesi tidak aktif atau tidak ditemukan.');
       return;
     }
 
-    if (String(session.class) !== String(formData.studentClass)) {
-      setError(`Sesi ini diperuntukkan bagi Kelas ${session.class}. Anda memilih Kelas ${formData.studentClass}.`);
+    // 5. Sinkronisasi Data Kelas Sesi
+    if (String(session.class).trim() !== inputClass) {
+      setError(`Sesi ${session.name} hanya untuk Kelas ${session.class}. Silakan pilih kelas yang sesuai.`);
       return;
     }
 
+    // Jika semua valid, lanjut ke Ruang Ujian
     onLogin(student, session);
   };
 
@@ -73,7 +84,7 @@ const StudentLogin: React.FC<StudentLoginProps> = ({ sessions, students, onLogin
       <button 
         onClick={onAdminClick}
         className="absolute top-6 right-6 p-3 text-slate-400 hover:text-indigo-600 hover:bg-white hover:shadow-md rounded-full transition-all duration-300 group"
-        title="Login Admin"
+        title="Portal Staff"
       >
         <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 group-hover:rotate-90 transition-transform duration-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
@@ -83,52 +94,47 @@ const StudentLogin: React.FC<StudentLoginProps> = ({ sessions, students, onLogin
 
       <div className="w-full max-w-md bg-white p-10 rounded-[2.5rem] shadow-2xl shadow-slate-200/50 border border-slate-100">
         <div className="text-center mb-10 flex flex-col items-center">
-          <div className="mb-6 w-24 h-24 bg-white rounded-3xl flex items-center justify-center border-2 border-slate-100 shadow-sm overflow-hidden p-2">
+          <div className="mb-6 w-24 h-24 bg-white rounded-3xl flex items-center justify-center border border-slate-100 shadow-sm overflow-hidden p-2">
             <img 
               src={LOGO_URL} 
-              alt="Logo Sekolah" 
+              alt="Logo" 
               className="w-full h-full object-contain"
-              onError={(e) => {
-                (e.target as HTMLImageElement).src = "https://via.placeholder.com/150?text=LOGO";
-              }}
+              onError={(e) => { (e.target as HTMLImageElement).src = "https://via.placeholder.com/150?text=AL-IRSYAD"; }}
             />
           </div>
           
-          <h1 className="text-4xl font-black text-slate-900 mb-2 tracking-tight">
-            SMP AL IRSYAD<span className="text-indigo-600">.</span>
-          </h1>
-          <p className="text-slate-500 font-medium italic">Sistem Ujian Semi-Online Terintegrasi</p>
+          <h1 className="text-4xl font-black text-slate-900 mb-1 tracking-tighter uppercase">EXAM SEMI-ONLINE</h1>
+          <p className="text-slate-400 text-xs font-black uppercase tracking-[0.2em]">SMP Al Irsyad Surakarta</p>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-5">
-          <div>
-            <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2 ml-1">Nomor Induk Siswa</label>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-1.5">
+            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Nomor Induk Siswa</label>
             <input
               type="text"
               required
               value={formData.nis}
               onChange={e => setFormData({...formData, nis: e.target.value})}
-              className="w-full px-5 py-4 rounded-2xl border border-slate-100 bg-slate-50 focus:bg-white focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all font-medium"
-              placeholder="Contoh: 4511"
+              className="w-full px-6 py-4 rounded-2xl border border-slate-100 bg-slate-50 focus:bg-white focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all font-bold"
+              placeholder="Contoh: 1234"
             />
           </div>
 
-          <div>
-            <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2 ml-1">Password</label>
-            <div className="relative group">
+          <div className="space-y-1.5">
+            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Password</label>
+            <div className="relative">
               <input
                 type={showPassword ? "text" : "password"}
                 required
                 value={formData.password}
                 onChange={e => setFormData({...formData, password: e.target.value})}
-                className="w-full px-5 py-4 rounded-2xl border border-slate-100 bg-slate-50 focus:bg-white focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all font-medium pr-14"
+                className="w-full px-6 py-4 rounded-2xl border border-slate-100 bg-slate-50 focus:bg-white focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all font-bold pr-14"
                 placeholder="••••••••"
               />
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
                 className="absolute right-4 top-1/2 -translate-y-1/2 p-2 text-slate-400 hover:text-indigo-600 transition-colors"
-                title={showPassword ? "Sembunyikan password" : "Tampilkan password"}
               >
                 {showPassword ? (
                   <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -145,35 +151,35 @@ const StudentLogin: React.FC<StudentLoginProps> = ({ sessions, students, onLogin
           </div>
 
           <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2 ml-1">Kelas</label>
+            <div className="space-y-1.5">
+              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Pilih Kelas</label>
               <select
                 required
                 value={formData.studentClass}
                 onChange={e => setFormData({...formData, studentClass: e.target.value})}
-                className="w-full px-5 py-4 rounded-2xl border border-slate-100 bg-slate-50 focus:bg-white focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all font-medium appearance-none"
+                className="w-full px-5 py-4 rounded-2xl border border-slate-100 bg-slate-50 focus:bg-white focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all font-bold appearance-none"
               >
-                <option value="">Pilih Kelas</option>
-                <option value="7">Kelas 7</option>
-                <option value="8">Kelas 8</option>
-                <option value="9">Kelas 9</option>
+                <option value="">Kelas</option>
+                <option value="7">Kls 7</option>
+                <option value="8">Kls 8</option>
+                <option value="9">Kls 9</option>
               </select>
             </div>
-            <div>
-              <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2 ml-1">PIN Sesi</label>
+            <div className="space-y-1.5">
+              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">PIN Sesi</label>
               <input
                 type="text"
                 required
                 value={formData.pin}
                 onChange={e => setFormData({...formData, pin: e.target.value})}
-                className="w-full px-5 py-4 rounded-2xl border border-slate-100 bg-slate-50 focus:bg-white focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all text-center tracking-widest font-mono font-bold"
+                className="w-full px-5 py-4 rounded-2xl border border-slate-100 bg-slate-50 focus:bg-white focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all text-center tracking-widest font-mono font-black uppercase"
                 placeholder="PIN"
               />
             </div>
           </div>
 
           {error && (
-            <div className="flex items-center gap-3 text-red-500 text-sm bg-red-50 p-4 rounded-2xl border border-red-100 animate-head-shake">
+            <div className="flex items-center gap-3 text-red-600 text-[11px] font-bold bg-red-50 p-4 rounded-2xl border border-red-100 animate-in slide-in-from-top-2">
               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 shrink-0" viewBox="0 0 20 20" fill="currentColor">
                 <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
               </svg>
@@ -183,29 +189,16 @@ const StudentLogin: React.FC<StudentLoginProps> = ({ sessions, students, onLogin
 
           <button
             type="submit"
-            className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-5 rounded-2xl shadow-xl shadow-indigo-200 transition-all active:scale-[0.98] mt-4"
+            className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-black py-5 rounded-2xl shadow-xl shadow-indigo-100 transition-all active:scale-[0.98] mt-4 uppercase text-xs tracking-widest"
           >
-            Mulai Ujian Sekarang
+            Mulai Ujian
           </button>
         </form>
       </div>
 
-      <footer className="mt-12 text-slate-400 text-sm font-medium">
-        &copy; 2026 HUMAS SMP Al Irsyad Surakarta
+      <footer className="mt-10 text-slate-400 text-[10px] font-black uppercase tracking-widest">
+        &copy; 2026 HUMAS SMP AL IRSYAD SURAKARTA
       </footer>
-
-      <style>{`
-        @keyframes head-shake {
-          0% { transform: translateX(0); }
-          25% { transform: translateX(-4px); }
-          50% { transform: translateX(4px); }
-          75% { transform: translateX(-4px); }
-          100% { transform: translateX(0); }
-        }
-        .animate-head-shake {
-          animation: head-shake 0.4s ease-in-out;
-        }
-      `}</style>
     </div>
   );
 };

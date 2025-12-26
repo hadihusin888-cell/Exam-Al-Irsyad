@@ -1,98 +1,140 @@
 
 /**
- * EXAMSY BACKEND V3.1 (Consistency Fix)
+ * EXAMSY BACKEND V7.0 - ULTIMATE DATA INTEGRITY
+ * Menggunakan penamaan kolom yang unik di setiap sheet untuk mencegah crash data
+ * dan memastikan sinkronisasi antara Siswa, Sesi, dan Ruang tetap terjaga.
  */
 
 function doGet(e) {
-  var data = getAllData();
-  return ContentService.createTextOutput(JSON.stringify(data))
-    .setMimeType(ContentService.MimeType.JSON);
+  return response(getAllData(), true);
 }
 
 function doPost(e) {
   try {
-    var contents;
-    if (typeof e.postData.contents === 'string') {
-      contents = JSON.parse(e.postData.contents);
-    } else {
-      contents = e.postData.contents;
-    }
-    
+    var contents = JSON.parse(e.postData.contents);
     var action = contents.action;
+    var payload = contents.payload;
 
-    if (action === 'UPDATE_STUDENT_STATUS') {
-      return updateStudentStatus(contents.nis, contents.status);
-    } 
-    
-    if (action === 'SYNC_ALL') {
-      return syncAllData(contents);
+    initDatabase();
+
+    switch (action) {
+      case 'ADD_STUDENT':
+        return addRow("STUDENTS", [payload.nis, payload.name, payload.class, payload.roomId || "", payload.password || "password123", "BELUM_MASUK"]);
+      case 'UPDATE_STUDENT':
+        return updateRow("STUDENTS", 0, payload.nis, {
+          1: payload.name,
+          2: payload.class,
+          3: payload.roomId || "",
+          4: payload.password,
+          5: payload.status
+        });
+      case 'DELETE_STUDENT':
+        return deleteRow("STUDENTS", 0, payload.nis);
+      case 'BULK_UPDATE_STUDENTS':
+        return bulkUpdateStudents(payload.selectedNis, payload.updates);
+
+      case 'ADD_SESSION':
+        return addRow("SESSIONS", [payload.id, payload.name, payload.class, payload.pin, payload.durationMinutes, payload.isActive, payload.pdfUrl || ""]);
+      case 'UPDATE_SESSION':
+        return updateRow("SESSIONS", 0, payload.id, {
+          1: payload.name,
+          2: payload.class,
+          3: payload.pin,
+          4: payload.durationMinutes,
+          5: payload.isActive,
+          6: payload.pdfUrl
+        });
+      case 'DELETE_SESSION':
+        return deleteRow("SESSIONS", 0, payload.id);
+
+      case 'ADD_ROOM':
+        return addRow("ROOMS", [payload.id, payload.name, payload.capacity, payload.username, payload.password]);
+      case 'UPDATE_ROOM':
+        return updateRow("ROOMS", 0, payload.id, {
+          1: payload.name,
+          2: payload.capacity,
+          3: payload.username,
+          4: payload.password
+        });
+      case 'DELETE_ROOM':
+        return deleteRow("ROOMS", 0, payload.id);
+
+      default:
+        return response("Action not recognized", false);
     }
-
-    return response("Action " + action + " not found", false);
   } catch (err) {
-    return response("Server Error: " + err.toString(), false);
+    return response(err.toString(), false);
   }
 }
 
-function updateStudentStatus(nis, newStatus) {
+function initDatabase() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  // Header dibuat unik sepenuhnya untuk setiap tabel
+  var sheets = {
+    "STUDENTS": ["NIS", "NAMA_SISWA", "KELAS_SISWA", "RUANGID", "PASSWORD", "STATUS"],
+    "SESSIONS": ["ID", "NAMA_UJIAN", "KELAS_UJIAN", "PIN", "DURASI", "AKTIF", "PDFURL"],
+    "ROOMS": ["ID", "NAMA_RUANG", "KAPASITAS", "USERNAME", "PASSWORD"]
+  };
+
+  for (var name in sheets) {
+    var sheet = ss.getSheetByName(name);
+    if (!sheet) {
+      sheet = ss.insertSheet(name);
+      sheet.appendRow(sheets[name]);
+      sheet.getRange(1, 1, 1, sheets[name].length).setFontWeight("bold").setBackground("#f3f4f6");
+    }
+  }
+}
+
+function addRow(sheetName, rowData) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(sheetName);
+  sheet.appendRow(rowData);
+  return response("Data berhasil ditambahkan", true);
+}
+
+function updateRow(sheetName, keyColIndex, keyValue, updates) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(sheetName);
+  var data = sheet.getDataRange().getValues();
+  for (var i = 1; i < data.length; i++) {
+    if (String(data[i][keyColIndex]) === String(keyValue)) {
+      for (var colIndex in updates) {
+        if (updates[colIndex] !== undefined) {
+          sheet.getRange(i + 1, parseInt(colIndex) + 1).setValue(updates[colIndex]);
+        }
+      }
+      return response("Update berhasil", true);
+    }
+  }
+  return response("Data tidak ditemukan", false);
+}
+
+function deleteRow(sheetName, keyColIndex, keyValue) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(sheetName);
+  var data = sheet.getDataRange().getValues();
+  for (var i = data.length - 1; i >= 1; i--) {
+    if (String(data[i][keyColIndex]) === String(keyValue)) {
+      sheet.deleteRow(i + 1);
+    }
+  }
+  return response("Hapus berhasil", true);
+}
+
+function bulkUpdateStudents(selectedNis, updates) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName("STUDENTS");
-  if (!sheet) return response("Sheet STUDENTS not found", false);
-  
-  var range = sheet.getDataRange();
-  var values = range.getValues();
-  var targetNis = String(nis).trim().toLowerCase();
-  
-  for (var i = 1; i < values.length; i++) {
-    var currentNis = String(values[i][0]).trim().toLowerCase();
-    if (currentNis === targetNis) {
-      // Column 6 is Status (F)
-      sheet.getRange(i + 1, 6).setValue(newStatus); 
-      return response("Status updated to " + newStatus, true);
+  var data = sheet.getDataRange().getValues();
+  selectedNis.forEach(function(nis) {
+    for (var i = 1; i < data.length; i++) {
+      if (String(data[i][0]) === String(nis)) {
+        if (updates.roomId !== undefined) sheet.getRange(i + 1, 4).setValue(updates.roomId);
+        if (updates.status !== undefined) sheet.getRange(i + 1, 6).setValue(updates.status);
+      }
     }
-  }
-  return response("NIS " + nis + " not found", false);
-}
-
-function syncAllData(data) {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  
-  function updateSheet(sheetName, headers, rowData, mapFn) {
-    var sheet = ss.getSheetByName(sheetName) || ss.insertSheet(sheetName);
-    sheet.clear();
-    
-    if (rowData && rowData.length > 0) {
-      var output = [headers];
-      rowData.forEach(function(item) {
-        output.push(mapFn(item));
-      });
-      sheet.getRange(1, 1, output.length, headers.length).setValues(output);
-    } else {
-      sheet.appendRow(headers);
-    }
-    sheet.getRange(1, 1, 1, headers.length).setBackground("#f1f5f9").setFontWeight("bold");
-    sheet.setFrozenRows(1);
-  }
-
-  if (data.students) {
-    updateSheet("STUDENTS", ["NIS", "Nama", "Kelas", "RuangID", "Password", "Status"], data.students, function(s) {
-      return [String(s.nis), s.name, s.class, s.roomId || "", s.password || "password123", s.status];
-    });
-  }
-
-  if (data.sessions) {
-    updateSheet("SESSIONS", ["ID", "Nama", "Kelas", "PIN", "Durasi", "Aktif", "PDFURL"], data.sessions, function(s) {
-      return [s.id, s.name, s.class, s.pin, s.durationMinutes, s.isActive, s.pdfUrl || ""];
-    });
-  }
-
-  if (data.rooms) {
-    updateSheet("ROOMS", ["ID", "Nama", "Kapasitas", "Username", "Password"], data.rooms, function(r) {
-      return [r.id, r.name, r.capacity, r.username || "", r.password || ""];
-    });
-  }
-
-  return response("Full sync complete", true);
+  });
+  return response("Update massal berhasil", true);
 }
 
 function getAllData() {
@@ -108,30 +150,34 @@ function getSheetData(sheet) {
   if (!sheet) return [];
   var range = sheet.getDataRange();
   if (range.getNumRows() < 2) return [];
-  
   var data = range.getValues();
   var headers = data[0];
   var result = [];
-  
   for (var i = 1; i < data.length; i++) {
     var obj = {};
     for (var j = 0; j < headers.length; j++) {
-      var key = String(headers[j]).toLowerCase();
-      if (key === "ruangid") key = "roomId";
-      if (key === "aktif") key = "isActive";
-      if (key === "durasi") key = "durationMinutes";
-      if (key === "pdfurl") key = "pdfUrl";
-      obj[key] = data[i][j];
+      var key = String(headers[j]).toUpperCase();
+      var propName = key.toLowerCase();
+      
+      // Mapping Header Unik ke Properti Objek Frontend
+      if (key === "NAMA_SISWA" || key === "NAMA_UJIAN" || key === "NAMA_RUANG") propName = "name";
+      if (key === "KELAS_SISWA" || key === "KELAS_UJIAN") propName = "class";
+      
+      if (key === "RUANGID") propName = "roomId";
+      if (key === "AKTIF") propName = "isActive";
+      if (key === "DURASI") propName = "durationMinutes";
+      if (key === "PDFURL") propName = "pdfUrl";
+      if (key === "KAPASITAS") propName = "capacity";
+      
+      obj[propName] = data[i][j];
     }
     result.push(obj);
   }
   return result;
 }
 
-function response(msg, success) {
-  return ContentService.createTextOutput(JSON.stringify({
-    success: success,
-    message: msg,
-    timestamp: new Date().toISOString()
-  })).setMimeType(ContentService.MimeType.JSON);
+function response(data, success) {
+  var res = { success: success, timestamp: new Date().toISOString() };
+  if (success) res.data = data; else res.message = data;
+  return ContentService.createTextOutput(JSON.stringify(res)).setMimeType(ContentService.MimeType.JSON);
 }

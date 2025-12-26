@@ -17,16 +17,19 @@ const AdminLogin: React.FC<AdminLoginProps> = ({ rooms, onLogin, onBack }) => {
     e.preventDefault();
     setError('');
 
-    // 1. Check Master Admin
-    if (formData.username === 'admin' && formData.password === 'admin123') {
+    const inputUser = formData.username.trim();
+    const inputPass = formData.password.trim();
+
+    // 1. Cek Admin Master (Default)
+    if (inputUser === 'admin' && inputPass === 'admin123') {
       onLogin('ADMIN');
       return;
     }
 
-    // 2. Check Proctor/Room Accounts
+    // 2. Cek Akun Proktor dari Database ROOMS
     const roomMatch = rooms.find(r => 
-      r.username === formData.username && 
-      r.password === formData.password
+      String(r.username || '').trim() === inputUser && 
+      String(r.password || '').trim() === inputPass
     );
 
     if (roomMatch) {
@@ -34,44 +37,49 @@ const AdminLogin: React.FC<AdminLoginProps> = ({ rooms, onLogin, onBack }) => {
       return;
     }
 
-    setError('Username atau password salah.');
+    setError('Username atau Password Staff salah.');
   };
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen p-6 bg-slate-900">
-      <div className="w-full max-w-md bg-white p-10 rounded-[2.5rem] shadow-2xl">
-        <button onClick={onBack} className="text-slate-400 hover:text-indigo-600 mb-8 flex items-center gap-2 text-sm font-bold uppercase tracking-widest transition-colors">
+    <div className="flex flex-col items-center justify-center min-h-screen p-6 bg-slate-950">
+      <div className="w-full max-w-md bg-white p-10 rounded-[3rem] shadow-2xl relative overflow-hidden">
+        {/* Decorative element */}
+        <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-50 rounded-bl-full opacity-50 -mr-10 -mt-10"></div>
+        
+        <button onClick={onBack} className="relative z-10 text-slate-400 hover:text-indigo-600 mb-8 flex items-center gap-2 text-[10px] font-black uppercase tracking-widest transition-colors">
           <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
           </svg>
           Kembali
         </button>
 
-        <h2 className="text-3xl font-black text-slate-900 mb-2 tracking-tight">Portal Staff</h2>
-        <p className="text-slate-500 mb-10 font-medium">Masuk sebagai Admin Master atau Proktor Ruang.</p>
+        <div className="relative z-10">
+          <h2 className="text-3xl font-black text-slate-900 mb-1 tracking-tighter uppercase leading-none">Portal Staff</h2>
+          <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest mb-10">Admin & Proktor Ruang</p>
+        </div>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div>
-            <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Username</label>
+        <form onSubmit={handleSubmit} className="space-y-5 relative z-10">
+          <div className="space-y-1.5">
+            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Username Staff</label>
             <input
               type="text"
               required
               value={formData.username}
               onChange={e => setFormData({...formData, username: e.target.value})}
-              className="w-full px-5 py-4 rounded-2xl border border-slate-100 bg-slate-50 focus:bg-white focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all font-medium"
-              placeholder="Username proktor"
+              className="w-full px-6 py-4 rounded-2xl border border-slate-100 bg-slate-50 focus:bg-white focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all font-bold"
+              placeholder="Username"
             />
           </div>
 
-          <div>
-            <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Password</label>
+          <div className="space-y-1.5">
+            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Password</label>
             <div className="relative">
               <input
                 type={showPassword ? "text" : "password"}
                 required
                 value={formData.password}
                 onChange={e => setFormData({...formData, password: e.target.value})}
-                className="w-full px-5 py-4 rounded-2xl border border-slate-100 bg-slate-50 focus:bg-white focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all font-medium pr-14"
+                className="w-full px-6 py-4 rounded-2xl border border-slate-100 bg-slate-50 focus:bg-white focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all font-bold pr-14"
                 placeholder="••••••••"
               />
               <button
@@ -88,11 +96,11 @@ const AdminLogin: React.FC<AdminLoginProps> = ({ rooms, onLogin, onBack }) => {
             </div>
           </div>
 
-          {error && <p className="text-red-500 text-xs font-bold bg-red-50 p-4 rounded-2xl border border-red-100">{error}</p>}
+          {error && <p className="text-red-500 text-[11px] font-bold bg-red-50 p-4 rounded-2xl border border-red-100">{error}</p>}
 
           <button
             type="submit"
-            className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-black py-5 rounded-2xl shadow-xl shadow-indigo-500/20 transition-all active:scale-[0.98]"
+            className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-black py-5 rounded-2xl shadow-xl shadow-indigo-500/20 transition-all active:scale-[0.98] uppercase text-xs tracking-widest"
           >
             Masuk Portal Staff
           </button>
