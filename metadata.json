@@ -1,0 +1,7 @@
+{
+  "name": "Examsy - Semi-Online Exam Platform",
+  "description": "A modern, minimalist semi-online examination platform with student and admin portals, integrated with Gemini for smart question management.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
