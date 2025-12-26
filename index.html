@@ -4,32 +4,32 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#4f46e5">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>Examsy - Modern Exam Platform</title>
+    
+    <link rel="manifest" href="/manifest.json">
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;900&display=swap" rel="stylesheet">
+    
     <style>
-        :root {
-            font-display: swap;
-        }
+        :root { font-display: swap; }
         body {
             font-family: 'Inter', sans-serif;
             background-color: #f8fafc;
             -webkit-tap-highlight-color: transparent;
             text-rendering: optimizeLegibility;
             -webkit-font-smoothing: antialiased;
+            overscroll-behavior-y: contain; /* Mencegah pull-to-refresh di Android */
         }
         .glass-card {
             background: rgba(255, 255, 255, 0.8);
             backdrop-filter: blur(12px);
             border: 1px solid rgba(255, 255, 255, 0.3);
         }
-        /* Smooth transition for view changes */
-        .fade-enter { opacity: 0; }
-        .fade-enter-active { opacity: 1; transition: opacity 300ms ease-in; }
-        
-        /* GPU Acceleration for heavy modals */
         .animate-gpu {
             will-change: transform, opacity;
             transform: translateZ(0);
@@ -51,5 +51,16 @@
 <body>
     <div id="root"></div>
     <script type="module" src="/index.tsx"></script>
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js').then(reg => {
+            console.log('SW Registered');
+          }).catch(err => {
+            console.log('SW Reg Failed', err);
+          });
+        });
+      }
+    </script>
 </body>
 </html>

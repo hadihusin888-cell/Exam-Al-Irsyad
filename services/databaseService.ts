@@ -1,48 +1,71 @@
 
 export const fetchFromCloud = async (url: string) => {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 detik timeout
+
   try {
-    // Gunakan cache buster untuk menghindari data lama (stale)
     const cacheBuster = `cb=${Date.now()}`;
     const finalUrl = url.includes('?') ? `${url}&${cacheBuster}` : `${url}?${cacheBuster}`;
     
-    // Google Apps Script memerlukan redirect: 'follow' (default) 
-    // dan seringkali gagal jika ada header custom yang memicu preflight OPTIONS
     const response = await fetch(finalUrl, { 
       method: 'GET',
       mode: 'cors',
-      redirect: 'follow'
+      cache: 'no-store',
+      redirect: 'follow',
+      signal: controller.signal
     });
     
+    clearTimeout(timeoutId);
+
     if (!response.ok) {
       throw new Error(`HTTP Error: ${response.status}`);
     }
 
     const result = await response.json();
     return result.success ? result.data : null;
-  } catch (error) {
+  } catch (error: any) {
+    clearTimeout(timeoutId);
     console.error("Gagal mengambil data dari Google Script:", error);
-    // Kembalikan null agar App.tsx bisa menangani status error
     return null;
   }
 };
 
 export const callCloudAction = async (url: string, action: string, payload: any) => {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 20000); // 20 detik untuk POST
+
   try {
-    // PENTING: Jangan set Content-Type: application/json secara manual.
-    // Fetch akan mengirimkan body string sebagai text/plain secara default.
-    // Ini dianggap sebagai 'Simple Request' oleh browser dan menghindari 'Preflight OPTIONS'
-    // yang tidak didukung oleh Google Apps Script.
+    // Kami menggunakan text/plain agar tidak memicu preflight OPTIONS
+    // Google Apps Script tidak mendukung OPTIONS request dengan baik
     const response = await fetch(url, {
       method: 'POST',
-      mode: 'cors',
+      mode: 'no-cors', // Coba no-cors jika cors gagal di WebView
       redirect: 'follow',
       body: JSON.stringify({ action, payload }),
+      signal: controller.signal
     });
     
-    const result = await response.json();
-    return result.success;
+    clearTimeout(timeoutId);
+    
+    // Karena no-cors, kita tidak bisa membaca response body secara langsung
+    // Namun untuk write action, biasanya kita asumsikan berhasil jika tidak ada error
+    return true; 
   } catch (error) {
-    console.error(`Action ${action} failed:`, error);
-    return false;
+    clearTimeout(timeoutId);
+    
+    // Fallback: coba lagi dengan mode cors jika no-cors gagal
+    try {
+      const retryResponse = await fetch(url, {
+        method: 'POST',
+        mode: 'cors',
+        redirect: 'follow',
+        body: JSON.stringify({ action, payload }),
+      });
+      const result = await retryResponse.json();
+      return result.success;
+    } catch (e) {
+      console.error(`Action ${action} failed:`, e);
+      return false;
+    }
   }
 };
