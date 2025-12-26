@@ -1,58 +1,64 @@
 
-/**
- * Database Service - Examsy
- * Menggunakan teknik "Simple Request" untuk menghindari CORS Preflight
- */
-
-const callApi = async (url: string, payload: any) => {
+export const syncToCloud = async (url: string, data: any) => {
   try {
-    // Kita kirim sebagai text/plain agar browser tidak melakukan preflight OPTIONS request
-    // Google Apps Script tetap bisa membaca body ini sebagai JSON string.
-    await fetch(url, {
+    const response = await fetch(url, {
       method: 'POST',
       mode: 'no-cors',
       headers: {
-        'Content-Type': 'text/plain',
+        'Content-Type': 'application/json',
       },
-      body: JSON.stringify(payload),
+      body: JSON.stringify({
+        action: 'SYNC_ALL',
+        ...data
+      }),
     });
     return true;
   } catch (error) {
-    console.error("Cloud Sync Error:", error);
+    console.error("Gagal sinkronisasi otomatis ke cloud:", error);
     return false;
   }
 };
 
-export const syncToCloud = async (url: string, data: any) => {
-  return callApi(url, {
-    action: 'SYNC_ALL',
-    ...data
-  });
-};
-
 export const updateStudentInCloud = async (url: string, nis: string, status: string) => {
-  return callApi(url, {
-    action: 'UPDATE_STUDENT_STATUS',
-    nis: nis,
-    status: status
-  });
+  try {
+    await fetch(url, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        action: 'UPDATE_STUDENT_STATUS',
+        nis: nis,
+        status: status
+      }),
+    });
+    return true;
+  } catch (error) {
+    console.error("Gagal update status siswa:", error);
+    return false;
+  }
 };
 
 export const fetchFromCloud = async (url: string) => {
   try {
-    // Tambahkan timestamp untuk menghindari cache browser yang menyimpan "failed redirect"
-    const cacheBuster = `t=${Date.now()}`;
-    const finalUrl = url.includes('?') ? `${url}&${cacheBuster}` : `${url}?${cacheBuster}`;
+    const controller = new AbortController();
+    const id = setTimeout(() => controller.abort(), 20000); 
 
-    const response = await fetch(finalUrl, { 
-      method: 'GET',
-      // Menggunakan default (cors/follow) tanpa header kustom agar redirect lancar
+    const response = await fetch(url, { 
+      signal: controller.signal,
+      cache: 'no-store'
     });
+    clearTimeout(id);
     
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    if (!response.ok) throw new Error(`Server returned ${response.status}`);
     return await response.json();
   } catch (error: any) {
-    console.warn("Fetch Error (Cloud):", error.message);
+    if (error.name === 'AbortError') {
+      console.warn("Koneksi Database Timeout (20s). Mencoba menggunakan data lokal...");
+    } else {
+      console.error("Database cloud tidak terjangkau:", error.message);
+    }
     return null;
   }
 };

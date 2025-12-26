@@ -1,25 +1,25 @@
 
 /**
- * EXAMSY BACKEND SCRIPT V2.1 (Stability Focus)
+ * EXAMSY BACKEND SCRIPT
  * ---------------------
+ * Cara Pasang:
+ * 1. Buka Google Sheets Anda.
+ * 2. Klik Menu 'Extensions' > 'Apps Script'.
+ * 3. Hapus kode yang ada, lalu tempel kode di bawah ini.
+ * 4. Buat 3 Sheet dengan nama: "STUDENTS", "SESSIONS", dan "ROOMS".
+ * 5. Klik 'Deploy' > 'New Deployment' > 'Web App'.
+ * 6. Set 'Who has access' ke 'Anyone'.
+ * 7. Copy URL Web App yang muncul ke konstanta GAS_URL di file App.tsx.
  */
 
 function doGet(e) {
-  var data = getAllData();
-  return ContentService.createTextOutput(JSON.stringify(data))
+  return ContentService.createTextOutput(JSON.stringify(getAllData()))
     .setMimeType(ContentService.MimeType.JSON);
 }
 
 function doPost(e) {
   try {
-    // Menangani payload jika dikirim sebagai string atau object
-    var contents;
-    if (typeof e.postData.contents === 'string') {
-      contents = JSON.parse(e.postData.contents);
-    } else {
-      contents = e.postData.contents;
-    }
-    
+    var contents = JSON.parse(e.postData.contents);
     var action = contents.action;
 
     if (action === 'UPDATE_STUDENT_STATUS') {
@@ -30,65 +30,65 @@ function doPost(e) {
       return syncAllData(contents);
     }
 
-    return response("Action " + action + " not found", false);
+    return response("Action not found", false);
   } catch (err) {
-    return response("Error: " + err.toString(), false);
+    return response(err.toString(), false);
   }
 }
 
+// FUNGSI UNTUK PROKTOR: Update status siswa secara spesifik
 function updateStudentStatus(nis, newStatus) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName("STUDENTS");
-  if (!sheet) return response("Sheet STUDENTS not found", false);
-  
   var data = sheet.getDataRange().getValues();
-  var nisTarget = String(nis).trim();
   
+  // Asumsi: Kolom A = NIS, Kolom F = Status
+  // Cari baris yang NIS-nya cocok
   for (var i = 1; i < data.length; i++) {
-    if (String(data[i][0]).trim() === nisTarget) {
-      sheet.getRange(i + 1, 6).setValue(newStatus); 
+    if (String(data[i][0]).trim() === String(nis).trim()) {
+      sheet.getCell(i + 1, 6).setValue(newStatus); // Update kolom ke-6 (F)
       return response("Status updated for " + nis, true);
     }
   }
+  
   return response("NIS " + nis + " not found", false);
 }
 
+// FUNGSI UNTUK ADMIN: Simpan seluruh database (Overwrite)
 function syncAllData(data) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   
-  function bulkUpdateSheet(sheetName, headers, items, mapFn) {
-    var sheet = ss.getSheetByName(sheetName) || ss.insertSheet(sheetName);
-    sheet.clear();
-    if (!items || items.length === 0) {
-      sheet.appendRow(headers);
-      return;
-    }
-    var rows = [headers];
-    items.forEach(function(item) {
-      rows.push(mapFn(item));
-    });
-    sheet.getRange(1, 1, rows.length, headers.length).setValues(rows);
-  }
-
+  // 1. Update Sheet STUDENTS
   if (data.students) {
-    bulkUpdateSheet("STUDENTS", ["NIS", "Nama", "Kelas", "RuangID", "Password", "Status"], data.students, function(s) {
-      return [String(s.nis), s.name, s.class, s.roomId || "", s.password || "password123", s.status];
+    var studentSheet = ss.getSheetByName("STUDENTS") || ss.insertSheet("STUDENTS");
+    studentSheet.clear();
+    studentSheet.appendRow(["NIS", "Nama", "Kelas", "RuangID", "Password", "Status"]);
+    data.students.forEach(function(s) {
+      studentSheet.appendRow([s.nis, s.name, s.class, s.roomId, s.password, s.status]);
     });
   }
 
+  // 2. Update Sheet SESSIONS
   if (data.sessions) {
-    bulkUpdateSheet("SESSIONS", ["ID", "Nama", "Kelas", "PIN", "Durasi", "Aktif", "PDFURL"], data.sessions, function(s) {
-      return [s.id, s.name, s.class, s.pin, s.durationMinutes, s.isActive, s.pdfUrl || ""];
+    var sessionSheet = ss.getSheetByName("SESSIONS") || ss.insertSheet("SESSIONS");
+    sessionSheet.clear();
+    sessionSheet.appendRow(["ID", "Nama", "Kelas", "PIN", "Durasi", "Aktif", "PDFURL"]);
+    data.sessions.forEach(function(s) {
+      sessionSheet.appendRow([s.id, s.name, s.class, s.pin, s.durationMinutes, s.isActive, s.pdfUrl]);
     });
   }
 
+  // 3. Update Sheet ROOMS
   if (data.rooms) {
-    bulkUpdateSheet("ROOMS", ["ID", "Nama", "Kapasitas", "Username", "Password"], data.rooms, function(r) {
-      return [r.id, r.name, r.capacity, r.username || "", r.password || ""];
+    var roomSheet = ss.getSheetByName("ROOMS") || ss.insertSheet("ROOMS");
+    roomSheet.clear();
+    roomSheet.appendRow(["ID", "Nama", "Kapasitas", "Username", "Password"]);
+    data.rooms.forEach(function(r) {
+      roomSheet.appendRow([r.id, r.name, r.capacity, r.username, r.password]);
     });
   }
 
-  return response("Database synchronized", true);
+  return response("Full database synced successfully", true);
 }
 
 function getAllData() {
@@ -102,9 +102,7 @@ function getAllData() {
 
 function getSheetData(sheet) {
   if (!sheet) return [];
-  var range = sheet.getDataRange();
-  if (range.getNumRows() < 2) return [];
-  var data = range.getValues();
+  var data = sheet.getDataRange().getValues();
   var headers = data[0];
   var result = [];
   
@@ -112,6 +110,7 @@ function getSheetData(sheet) {
     var obj = {};
     for (var j = 0; j < headers.length; j++) {
       var key = headers[j].toLowerCase();
+      // Mapping nama kolom agar sesuai dengan interface TypeScript
       if (key === "ruangid") key = "roomId";
       if (key === "aktif") key = "isActive";
       if (key === "durasi") key = "durationMinutes";
@@ -124,7 +123,8 @@ function getSheetData(sheet) {
 }
 
 function response(msg, success) {
-  var res = { success: success, message: msg, timestamp: new Date().getTime() };
-  return ContentService.createTextOutput(JSON.stringify(res))
-    .setMimeType(ContentService.MimeType.JSON);
+  return ContentService.createTextOutput(JSON.stringify({
+    success: success,
+    message: msg
+  })).setMimeType(ContentService.MimeType.JSON);
 }

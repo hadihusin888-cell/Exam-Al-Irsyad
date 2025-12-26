@@ -40,7 +40,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   const [showAddModal, setShowAddModal] = useState(false);
   const [showAddRoomModal, setShowAddRoomModal] = useState(false);
-  const [showAddStudentModal, setShowAddStudentModal] = useState(false);
   
   const [searchTerm, setSearchTerm] = useState('');
   const [roomFilter, setRoomFilter] = useState('ALL');
@@ -152,30 +151,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
     setShowAddRoomModal(false);
   };
 
-  const handleSaveNewStudent = (e: React.FormEvent) => {
-    e.preventDefault();
-    const formData = new FormData(e.currentTarget as HTMLFormElement);
-    const nis = String(formData.get('nis')).trim();
-    
-    // Validasi Duplikat NIS
-    if (students.some(s => String(s.nis).trim() === nis)) {
-      alert(`NIS ${nis} sudah terdaftar di database!`);
-      return;
-    }
-
-    const newStudent: Student = {
-      nis: nis,
-      name: formData.get('name') as string,
-      class: formData.get('class') as string,
-      password: (formData.get('password') as string) || 'password123',
-      status: StudentStatus.BELUM_MASUK,
-      roomId: formData.get('roomId') ? String(formData.get('roomId')).trim() : undefined
-    };
-
-    setStudents(prev => [...prev, newStudent]);
-    setShowAddStudentModal(false);
-  };
-
   const handleSaveEditRoom = (e: React.FormEvent) => {
     e.preventDefault();
     if (roomToEdit) {
@@ -193,8 +168,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   };
 
   const handleDownloadTemplate = () => {
-    const headers = "NIS,Nama,Kelas,RuangID,Password,Status\n";
-    const sampleData = "4511,Ahmad Zakaria,7,RUANG 01,password123,BELUM_MASUK\n2024002,Siti Aminah,8,RUANG 02,password456,BELUM_MASUK\n";
+    const headers = "NIS,Nama Lengkap,Kelas,Nama Ruang,Password,Status\n";
+    const sampleData = "2024001,Contoh Nama Siswa,7,RUANG 01,password123,BELUM_MASUK\n";
     const blob = new Blob([headers + sampleData], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -375,11 +350,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     <option value="">Tanpa Ruang</option>
                   </select>
                   <input type="text" placeholder="Cari Nama atau NIS..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full md:w-64 pl-4 pr-4 py-4 bg-white border border-slate-200 rounded-2xl text-sm font-medium focus:border-indigo-500 outline-none shadow-sm" />
-                  <button onClick={() => setShowAddStudentModal(true)} className="bg-indigo-600 text-white px-6 py-4 rounded-2xl font-black text-xs uppercase shadow-lg shadow-indigo-100">+ Tambah Siswa</button>
+                  <button onClick={handleDownloadTemplate} className="bg-white border border-slate-200 text-slate-600 px-6 py-4 rounded-2xl font-black text-xs uppercase shadow-sm">Template</button>
                   <button onClick={() => fileInputRef.current?.click()} className="bg-slate-900 text-white px-8 py-4 rounded-2xl font-black text-xs uppercase shadow-xl">Impor CSV</button>
-                  <button onClick={handleDownloadTemplate} className="bg-white border border-slate-200 text-slate-400 p-4 rounded-2xl hover:text-slate-600 transition-colors" title="Download Template CSV">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
-                  </button>
                   <input type="file" ref={fileInputRef} className="hidden" accept=".csv" onChange={handleImportCSV} />
                 </div>
              </div>
@@ -399,7 +371,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                         </div>
                       </th>
                       <th className="px-6 py-6">NIS</th>
-                      <th className="px-10 py-6">Nama</th>
+                      <th className="px-10 py-6">Nama Lengkap</th>
                       <th className="px-10 py-6 text-center">Kelas</th>
                       <th className="px-10 py-6">Ruang</th>
                       <th className="px-10 py-6 text-center">Status</th>
@@ -523,7 +495,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
           className="fixed bottom-10 right-10 z-[999] pointer-events-none animate-in slide-in-from-right-10 fade-in duration-300"
         >
           <div className="w-[450px] h-[600px] bg-white rounded-[2.5rem] shadow-2xl border border-slate-200 overflow-hidden flex flex-col shadow-indigo-500/10 relative">
+            {/* GLOBAL INTERACTION SHIELD UNTUK PREVIEW: Menutup seluruh area iframe */}
             <div className="absolute inset-0 z-[1000] pointer-events-auto bg-transparent" title="Preview Locked"></div>
+
             <div className="flex items-center justify-between px-8 py-4 border-b border-slate-50 bg-slate-50/50">
                <div className="flex items-center gap-3">
                   <div className="w-2 h-2 bg-indigo-600 rounded-full animate-pulse"></div>
@@ -537,64 +511,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
           </div>
         </div>
       )}
-
-      {/* MODAL: TAMBAH SISWA MANUAL */}
-      {showAddStudentModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-slate-900/60 backdrop-blur-sm">
-          <div className="bg-white w-full max-w-lg p-10 rounded-[2.5rem] shadow-2xl overflow-y-auto max-h-[90vh] border border-slate-100">
-            <div className="flex items-center gap-4 mb-8">
-               <div className="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" /></svg>
-               </div>
-               <h3 className="text-2xl font-black text-slate-900 tracking-tight">Tambah Siswa Baru</h3>
-            </div>
-            
-            <form onSubmit={handleSaveNewStudent} className="space-y-6">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-bold text-slate-400 uppercase mb-2 tracking-widest ml-1">NIS (Wajib)</label>
-                  <input name="nis" type="text" required className="w-full px-5 py-4 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-mono font-bold text-indigo-600 outline-none focus:border-indigo-500" placeholder="4511" />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-slate-400 uppercase mb-2 tracking-widest ml-1">Password</label>
-                  <input name="password" type="text" defaultValue="password123" className="w-full px-5 py-4 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-medium outline-none focus:border-indigo-500" />
-                </div>
-              </div>
-              
-              <div>
-                <label className="block text-xs font-bold text-slate-400 uppercase mb-2 tracking-widest ml-1">Nama Lengkap</label>
-                <input name="name" type="text" required className="w-full px-5 py-4 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-medium outline-none focus:border-indigo-500" placeholder="Ahmad Zakaria" />
-              </div>
-              
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-bold text-slate-400 uppercase mb-2 tracking-widest ml-1">Kelas</label>
-                  <select name="class" required className="w-full px-5 py-4 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-medium outline-none focus:border-indigo-500">
-                    <option value="7">Kelas 7</option>
-                    <option value="8">Kelas 8</option>
-                    <option value="9">Kelas 9</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-slate-400 uppercase mb-2 tracking-widest ml-1">Penugasan Ruang</label>
-                  <select name="roomId" className="w-full px-5 py-4 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-medium outline-none focus:border-indigo-500">
-                    <option value="">Tanpa Ruang</option>
-                    {rooms.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
-                  </select>
-                </div>
-              </div>
-              
-              <div className="pt-4 flex gap-3">
-                <button type="button" onClick={() => setShowAddStudentModal(false)} className="flex-1 bg-slate-50 text-slate-500 font-bold py-4 rounded-2xl">Batal</button>
-                <button type="submit" className="flex-1 bg-indigo-600 text-white font-black py-4 rounded-2xl shadow-xl shadow-indigo-100">Simpan Siswa</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL LAINNYA DIBAWAH TETAP SAMA SEPERTI SEBELUMNYA */}
-      {/* ... (Modal-modal lain tetap ada di file ini) ... */}
 
       {/* MODAL: EDIT DATA SESI UJIAN */}
       {sessionToEdit && (
@@ -665,6 +581,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
         </div>
       )}
 
+      {/* MODAL LAINNYA: BUAT UJIAN BARU */}
       {showAddModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-slate-900/60 backdrop-blur-sm">
           <div className="bg-white w-full max-w-lg p-10 rounded-[2.5rem] shadow-2xl overflow-y-auto max-h-[90vh]">
@@ -686,6 +603,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
         </div>
       )}
 
+      {/* MODAL: PENGATURAN MASSAL */}
       {showBulkRoomModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-slate-900/60 backdrop-blur-sm">
           <div className="bg-white w-full max-w-md p-10 rounded-[2.5rem] shadow-2xl border border-slate-100">
@@ -720,6 +638,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
         </div>
       )}
 
+      {/* MODAL: EDIT RUANG */}
       {roomToEdit && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-slate-900/60 backdrop-blur-sm">
           <div className="bg-white w-full max-w-md p-10 rounded-[2.5rem] shadow-2xl border border-slate-100">
@@ -764,6 +683,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
         </div>
       )}
 
+      {/* MODAL: TAMBAH RUANG */}
       {showAddRoomModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-slate-900/60 backdrop-blur-sm">
           <div className="bg-white w-full max-w-md p-10 rounded-[2.5rem] shadow-2xl border border-slate-100">
@@ -784,6 +704,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
         </div>
       )}
 
+      {/* MODAL: KONFIRMASI HAPUS */}
       {(roomToDelete || sessionToDelete || studentToDelete) && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center p-6 bg-slate-950/80 backdrop-blur-md">
           <div className="bg-white w-full max-w-sm p-10 rounded-[3.5rem] shadow-2xl text-center border border-slate-100">
@@ -825,6 +746,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
         </div>
       )}
 
+      {/* MODAL: EDIT DATA SISWA */}
       {studentToEdit && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-slate-900/60 backdrop-blur-sm">
           <div className="bg-white w-full max-w-lg p-10 rounded-[2.5rem] shadow-2xl border border-slate-100">

@@ -6,9 +6,9 @@ import AdminLogin from './views/AdminLogin';
 import AdminDashboard from './views/AdminDashboard';
 import ProctorDashboard from './views/ProctorDashboard';
 import ExamRoom from './views/ExamRoom';
-import { fetchFromCloud, syncToCloud, updateStudentInCloud } from './services/databaseService';
+import { fetchFromCloud, syncToCloud } from './services/databaseService';
 
-const GAS_URL = "https://script.google.com/macros/s/AKfycbw-2xIPmBubGL3rq2OZDc0_1xB45F46fZNLUDo6VvCZs9OFTQRFnNjQkZkWlF1Gj6gM1w/exec"; 
+const GAS_URL = "https://script.google.com/macros/s/AKfycby8Z8BdPpZ_dMhYFOFXdeBmdTVvBjBsY43FCXXw3vKmtFYCBdS7XH7t7F1pz5R9I97GbQ/exec"; 
 
 const App: React.FC = () => {
   const [view, setView] = useState<ViewState>('STUDENT_LOGIN');
@@ -16,142 +16,167 @@ const App: React.FC = () => {
   const [currentSession, setCurrentSession] = useState<ExamSession | null>(null);
   const [activeRoom, setActiveRoom] = useState<Room | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isInitialLoadComplete, setIsInitialLoadComplete] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
-  const [isCloudLoaded, setIsCloudLoaded] = useState(false);
 
   const [students, setStudents] = useState<Student[]>([]);
   const [sessions, setSessions] = useState<ExamSession[]>([]);
   const [rooms, setRooms] = useState<Room[]>([]);
 
-  const lastCloudCount = useRef({ students: 0, sessions: 0, rooms: 0 });
+  const lastKnownDataCount = useRef({ sessions: 0, students: 0, rooms: 0 });
 
   const normalizeData = (data: any) => {
     if (!data || typeof data !== 'object') return null;
-    const s = data.students || [];
-    const sess = data.sessions || [];
-    const r = data.rooms || [];
+    const rawStudents = data.students || data.STUDENTS;
+    const rawSessions = data.sessions || data.SESSIONS;
+    if (!rawStudents && !rawSessions) return null;
 
-    return {
-      students: s.map((item: any) => ({
-        nis: String(item.nis || '').trim(),
-        name: String(item.name || ''),
-        class: String(item.class || ''),
-        password: String(item.password || 'password123'),
-        status: (item.status || StudentStatus.BELUM_MASUK) as StudentStatus,
-        roomId: String(item.roomId || '').trim()
-      })),
-      sessions: sess.map((item: any) => ({
-        id: String(item.id || ''),
-        name: String(item.name || ''),
-        class: String(item.class || ''),
-        pin: String(item.pin || ''),
-        durationMinutes: Number(item.durationMinutes || 60),
-        isActive: item.isActive === true || item.isActive === 'TRUE',
-        questions: [],
-        pdfUrl: String(item.pdfUrl || '')
-      })),
-      rooms: r.map((item: any) => ({
-        id: String(item.id || ''),
-        name: String(item.name || ''),
-        capacity: Number(item.capacity || 0),
-        username: String(item.username || ''),
-        password: String(item.password || '')
-      }))
-    };
+    const normalizedStudents = (rawStudents || []).map((s: any) => ({
+      nis: String(s.nis || s.NIS || s.Nis || '').trim(),
+      name: String(s.name || s.NAME || s.Nama || ''),
+      class: String(s.class || s.CLASS || s.Kelas || ''),
+      password: String(s.password || s.PASSWORD || s.Password || 'password123'),
+      status: (s.status || s.STATUS || StudentStatus.BELUM_MASUK) as StudentStatus,
+      roomId: String(s.roomId || s.ROOMID || s.RoomId || s.ruangId || '').trim()
+    }));
+
+    const normalizedRooms = (data.rooms || data.ROOMS || []).map((r: any) => ({
+      id: String(r.id || r.ID || '').trim(),
+      name: String(r.name || r.NAME || ''),
+      capacity: Number(r.capacity || r.CAPACITY || 0),
+      username: String(r.username || r.USERNAME || ''),
+      password: String(r.password || r.PASSWORD || '')
+    }));
+
+    const normalizedSessions = (rawSessions || []).map((sess: any) => ({
+      id: String(sess.id || sess.ID || ''),
+      name: String(sess.name || sess.NAME || ''),
+      class: String(sess.class || sess.CLASS || ''),
+      pin: String(sess.pin || sess.PIN || ''),
+      durationMinutes: Number(sess.durationMinutes || sess.DURATION || 60),
+      isActive: sess.isActive === true || sess.isActive === 'TRUE' || sess.isActive === 'active',
+      questions: [],
+      pdfUrl: String(sess.pdfUrl || sess.PDFURL || '')
+    }));
+
+    return { students: normalizedStudents, rooms: normalizedRooms, sessions: normalizedSessions };
   };
 
   useEffect(() => {
-    const initData = async () => {
-      setIsLoading(true);
-      
-      const localS = localStorage.getItem('examsy_students');
-      const localSess = localStorage.getItem('examsy_sessions');
-      const localR = localStorage.getItem('examsy_rooms');
-      if (localS) setStudents(JSON.parse(localS));
-      if (localSess) setSessions(JSON.parse(localSess));
-      if (localR) setRooms(JSON.parse(localR));
+    const initApp = async () => {
+      let finalStudents: Student[] = [];
+      let finalSessions: ExamSession[] = [];
+      let finalRooms: Room[] = [];
 
-      if (GAS_URL) {
-        const cloudData = await fetchFromCloud(GAS_URL);
-        const normalized = normalizeData(cloudData);
-        if (normalized) {
-          setStudents(normalized.students);
-          setSessions(normalized.sessions);
-          setRooms(normalized.rooms);
-          lastCloudCount.current = {
-            students: normalized.students.length,
-            sessions: normalized.sessions.length,
-            rooms: normalized.rooms.length
-          };
-          setIsCloudLoaded(true);
-        }
+      try {
+        const savedStudents = localStorage.getItem('examsy_students');
+        const savedSessions = localStorage.getItem('examsy_sessions');
+        const savedRooms = localStorage.getItem('examsy_rooms');
+        if (savedStudents) finalStudents = JSON.parse(savedStudents);
+        if (savedSessions) finalSessions = JSON.parse(savedSessions);
+        if (savedRooms) finalRooms = JSON.parse(savedRooms);
+      } catch (e) {}
+
+      if (GAS_URL && !GAS_URL.includes("dummy")) {
+        try {
+          const cloudData = await fetchFromCloud(GAS_URL);
+          const normalized = normalizeData(cloudData);
+          if (normalized && (normalized.sessions.length > 0 || normalized.students.length > 0)) {
+            finalStudents = normalized.students;
+            finalSessions = normalized.sessions;
+            finalRooms = normalized.rooms;
+          }
+        } catch (e) {}
       }
+      
+      setStudents(finalStudents);
+      setSessions(finalSessions);
+      setRooms(finalRooms);
+      lastKnownDataCount.current = { sessions: finalSessions.length, students: finalStudents.length, rooms: finalRooms.length };
       setIsLoading(false);
+      setTimeout(() => setIsInitialLoadComplete(true), 1500);
     };
-    initData();
-  }, []);
 
-  useEffect(() => {
-    if (view === 'EXAM_ROOM' || !isCloudLoaded) return;
+    initApp();
 
     const interval = setInterval(async () => {
-      if (!isSyncing) {
+      if (GAS_URL && !GAS_URL.includes("dummy") && !isSyncing && isInitialLoadComplete) {
         const cloudData = await fetchFromCloud(GAS_URL);
         const normalized = normalizeData(cloudData);
-        if (normalized && view !== 'ADMIN_DASHBOARD') {
+        if (normalized && (normalized.sessions.length > 0 || normalized.students.length > 0)) {
           setStudents(normalized.students);
           setSessions(normalized.sessions);
           setRooms(normalized.rooms);
+          lastKnownDataCount.current = { sessions: normalized.sessions.length, students: normalized.students.length, rooms: normalized.rooms.length };
         }
       }
-    }, 45000); 
+    }, 60000); // Poll every 1 minute to stay updated
 
     return () => clearInterval(interval);
-  }, [view, isSyncing, isCloudLoaded]);
+  }, [isInitialLoadComplete, isSyncing]);
 
+  // Global Sync Logic (Restricted)
   useEffect(() => {
-    if (view !== 'ADMIN_DASHBOARD' || !isCloudLoaded) return;
+    if (!isInitialLoadComplete || isLoading) return;
+    if (lastKnownDataCount.current.sessions > 0 && sessions.length === 0) return;
+    if (lastKnownDataCount.current.students > 0 && students.length === 0) return;
 
-    if (lastCloudCount.current.students > 0 && students.length === 0) return;
+    localStorage.setItem('examsy_sessions', JSON.stringify(sessions));
+    localStorage.setItem('examsy_students', JSON.stringify(students));
+    localStorage.setItem('examsy_rooms', JSON.stringify(rooms));
 
-    const timer = setTimeout(async () => {
+    // PENTING: Jangan biarkan Proktor melakukan Full Sync (Overwrite) ke cloud.
+    // Full Sync hanya boleh dilakukan oleh Admin atau saat inisialisasi.
+    if (!GAS_URL || GAS_URL.includes("dummy") || view !== 'ADMIN_DASHBOARD') return;
+
+    const syncTimer = setTimeout(async () => {
       setIsSyncing(true);
       const success = await syncToCloud(GAS_URL, { students, sessions, rooms });
-      if (success) {
-        localStorage.setItem('examsy_students', JSON.stringify(students));
-        localStorage.setItem('examsy_sessions', JSON.stringify(sessions));
-        localStorage.setItem('examsy_rooms', JSON.stringify(rooms));
-      }
       setIsSyncing(false);
-    }, 3000);
+      if (success) {
+        lastKnownDataCount.current = { sessions: sessions.length, students: students.length, rooms: rooms.length };
+      }
+    }, 5000);
 
-    return () => clearTimeout(timer);
-  }, [students, sessions, rooms, view, isCloudLoaded]);
+    return () => clearTimeout(syncTimer);
+  }, [students, sessions, rooms, isInitialLoadComplete, isLoading, view]);
 
-  const handleStudentLogin = async (student: Student, session: ExamSession) => {
+  const updateStudentStatus = (nis: string, status: StudentStatus) => {
+    setStudents(prev => prev.map(s => s.nis === nis ? { ...s, status } : s));
+  };
+
+  const handleStudentLogin = (student: Student, session: ExamSession) => {
+    if (!session || !student) return;
     setCurrentUser(student);
     setCurrentSession(session);
-    setStudents(prev => prev.map(s => s.nis === student.nis ? { ...s, status: StudentStatus.SEDANG_UJIAN } : s));
-    await updateStudentInCloud(GAS_URL, student.nis, StudentStatus.SEDANG_UJIAN);
+    updateStudentStatus(student.nis, StudentStatus.SEDANG_UJIAN);
     setView('EXAM_ROOM');
   };
 
-  const handleExitExam = async () => {
-    if (currentUser) {
-      setStudents(prev => prev.map(s => s.nis === currentUser.nis ? { ...s, status: StudentStatus.SELESAI } : s));
-      await updateStudentInCloud(GAS_URL, currentUser.nis, StudentStatus.SELESAI);
+  const handleStaffLogin = (role: 'ADMIN' | 'PROCTOR', targetRoom?: Room) => {
+    if (role === 'ADMIN') setView('ADMIN_DASHBOARD');
+    else if (role === 'PROCTOR' && targetRoom) {
+      setActiveRoom(targetRoom);
+      setView('PROCTOR_DASHBOARD');
     }
+  };
+  
+  const handleExitExam = () => {
+    if (currentUser) updateStudentStatus(currentUser.nis, StudentStatus.SELESAI);
     setCurrentUser(null);
     setCurrentSession(null);
     setView('STUDENT_LOGIN');
   };
 
-  if (isLoading && !isCloudLoaded) {
+  if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-950">
-        <div className="flex flex-col items-center gap-4">
-          <div className="w-12 h-12 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
-          <p className="text-indigo-400 font-bold tracking-widest text-xs uppercase animate-pulse">Syncing Database...</p>
+      <div className="min-h-screen flex items-center justify-center bg-slate-950 font-sans">
+        <div className="flex flex-col items-center gap-6">
+          <div className="w-12 h-12 border-[6px] border-indigo-600 border-t-transparent rounded-full animate-spin shadow-lg"></div>
+          <div className="text-center">
+            <p className="text-white font-black text-xs uppercase tracking-[0.3em] mb-1">Examsy Core</p>
+            <p className="text-slate-500 font-bold text-[9px] uppercase tracking-widest animate-pulse">Menghubungkan Database...</p>
+          </div>
         </div>
       </div>
     );
@@ -160,10 +185,10 @@ const App: React.FC = () => {
   const renderView = () => {
     switch (view) {
       case 'STUDENT_LOGIN': return <StudentLogin sessions={sessions} students={students} onLogin={handleStudentLogin} onAdminClick={() => setView('ADMIN_LOGIN')} />;
-      case 'ADMIN_LOGIN': return <AdminLogin rooms={rooms} onLogin={(role, room) => { if(role==='ADMIN') setView('ADMIN_DASHBOARD'); else { setActiveRoom(room!); setView('PROCTOR_DASHBOARD'); } }} onBack={() => setView('STUDENT_LOGIN')} />;
+      case 'ADMIN_LOGIN': return <AdminLogin rooms={rooms} onLogin={handleStaffLogin} onBack={() => setView('STUDENT_LOGIN')} />;
       case 'ADMIN_DASHBOARD': return <AdminDashboard sessions={sessions} setSessions={setSessions} students={students} setStudents={setStudents} rooms={rooms} setRooms={setRooms} isSyncing={isSyncing} onLogout={() => setView('STUDENT_LOGIN')} />;
-      case 'PROCTOR_DASHBOARD': return <ProctorDashboard gasUrl={GAS_URL} room={activeRoom!} students={students} setStudents={setStudents} isSyncing={isSyncing} onLogout={() => setView('STUDENT_LOGIN')} />;
-      case 'EXAM_ROOM': return <ExamRoom student={currentUser!} session={currentSession!} onFinish={handleExitExam} />;
+      case 'PROCTOR_DASHBOARD': return activeRoom ? <ProctorDashboard room={activeRoom} students={students} setStudents={setStudents} isSyncing={isSyncing} onLogout={() => { setActiveRoom(null); setView('STUDENT_LOGIN'); }} /> : null;
+      case 'EXAM_ROOM': return currentUser && currentSession ? <ExamRoom student={currentUser} session={currentSession} onFinish={handleExitExam} /> : null;
       default: return <StudentLogin sessions={sessions} students={students} onLogin={handleStudentLogin} onAdminClick={() => setView('ADMIN_LOGIN')} />;
     }
   };

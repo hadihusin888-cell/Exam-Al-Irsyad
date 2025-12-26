@@ -4,7 +4,6 @@ import { Student, StudentStatus, Room } from '../types';
 import { updateStudentInCloud } from '../services/databaseService';
 
 interface ProctorDashboardProps {
-  gasUrl: string;
   room: Room;
   students: Student[];
   setStudents: React.Dispatch<React.SetStateAction<Student[]>>;
@@ -13,7 +12,7 @@ interface ProctorDashboardProps {
 }
 
 const ProctorDashboard: React.FC<ProctorDashboardProps> = ({ 
-  gasUrl, room, students, setStudents, isSyncing: globalSyncing, onLogout 
+  room, students, setStudents, isSyncing: globalSyncing, onLogout 
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
@@ -44,8 +43,11 @@ const ProctorDashboard: React.FC<ProctorDashboardProps> = ({
     if (selectedStudent && pendingStatus) {
       setIsUpdating(true);
       
-      const success = await updateStudentInCloud(gasUrl, selectedStudent.nis, pendingStatus);
+      // 1. Update Cloud Secara Spesifik (Hanya NIS ini)
+      const GAS_URL = "https://script.google.com/macros/s/AKfycby8Z8BdPpZ_dMhYFOFXdeBmdTVvBjBsY43FCXXw3vKmtFYCBdS7XH7t7F1pz5R9I97GbQ/exec";
+      const success = await updateStudentInCloud(GAS_URL, selectedStudent.nis, pendingStatus);
       
+      // 2. Update Local State
       if (success) {
         setStudents(prev => prev.map(s => 
           s.nis === selectedStudent.nis ? { ...s, status: pendingStatus } : s
