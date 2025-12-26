@@ -55,4 +55,4 @@ export interface ExamSubmission {
   submittedAt: string;
 }
 
-export type ViewState = 'LANDING' | 'STUDENT_LOGIN' | 'ADMIN_LOGIN' | 'STUDENT_DASHBOARD' | 'ADMIN_DASHBOARD' | 'PROCTOR_DASHBOARD' | 'EXAM_ROOM' | 'EXAM_SUMMARY';
+export type ViewState = 'STUDENT_LOGIN' | 'ADMIN_LOGIN' | 'STUDENT_DASHBOARD' | 'ADMIN_DASHBOARD' | 'PROCTOR_DASHBOARD' | 'EXAM_ROOM' | 'EXAM_SUMMARY';
