@@ -17,7 +17,6 @@ const ProctorDashboard: React.FC<ProctorDashboardProps> = ({
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [pendingStatus, setPendingStatus] = useState<StudentStatus | null>(null);
-  const [isUpdating, setIsUpdating] = useState(false);
 
   const filteredStudents = useMemo(() => {
     return students.filter(s => {
@@ -32,12 +31,13 @@ const ProctorDashboard: React.FC<ProctorDashboardProps> = ({
     });
   }, [students, room.id, searchTerm]);
 
-  const handleSaveStatus = async () => {
+  const handleSaveStatus = () => {
     if (selectedStudent && pendingStatus) {
-      setIsUpdating(true);
-      const success = await onAction('UPDATE_STUDENT', { ...selectedStudent, status: pendingStatus });
-      setIsUpdating(false);
-      if (success) setSelectedStudent(null);
+      // Jalankan aksi di background
+      onAction('UPDATE_STUDENT', { ...selectedStudent, status: pendingStatus });
+      // Tutup modal secara instan (Optimistic)
+      setSelectedStudent(null);
+      setPendingStatus(null);
     }
   };
 
@@ -170,7 +170,7 @@ const ProctorDashboard: React.FC<ProctorDashboardProps> = ({
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-300">
           <div className="bg-white w-full max-w-sm p-8 md:p-10 rounded-[2.5rem] md:rounded-[3rem] shadow-2xl animate-in zoom-in-95 duration-300">
             <div className="text-center mb-8">
-              <span className="text-[9px] md:text-[10px] font-black text-indigo-500 uppercase tracking-widest block mb-2">Manajemen Status Siswa</span>
+              <span className="text-[9px] md:text-[10px] font-black text-emerald-600 uppercase tracking-widest block mb-2">Manajemen Status Siswa</span>
               <h3 className="text-xl md:text-2xl font-black text-slate-900 uppercase tracking-tighter leading-tight">{selectedStudent.name}</h3>
               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tight mt-1">Kelas {selectedStudent.class} • {selectedStudent.nis}</p>
             </div>
@@ -182,7 +182,7 @@ const ProctorDashboard: React.FC<ProctorDashboardProps> = ({
                   onClick={() => setPendingStatus(status)}
                   className={`w-full py-4 rounded-2xl border-2 font-black text-[10px] md:text-[11px] uppercase tracking-widest transition-all duration-300 ${
                     pendingStatus === status 
-                    ? 'bg-indigo-600 border-indigo-600 text-white shadow-xl shadow-indigo-100' 
+                    ? 'bg-emerald-600 border-emerald-600 text-white shadow-xl shadow-emerald-100' 
                     : 'bg-slate-50 border-slate-50 text-slate-400 hover:border-slate-200'
                   }`}
                 >
@@ -194,14 +194,12 @@ const ProctorDashboard: React.FC<ProctorDashboardProps> = ({
             <div className="flex flex-col gap-2">
               <button 
                 onClick={handleSaveStatus} 
-                disabled={isUpdating} 
-                className="w-full bg-slate-900 text-white py-4.5 rounded-2xl font-black text-xs uppercase tracking-[0.15em] shadow-xl flex items-center justify-center gap-3 active:scale-95 transition-all disabled:opacity-50"
+                className="group w-full bg-gradient-to-r from-indigo-600 to-indigo-700 text-white py-4 md:py-5 rounded-2xl font-black text-xs uppercase tracking-[0.2em] shadow-xl shadow-indigo-500/25 flex items-center justify-center gap-3 active:scale-95 transition-all duration-300"
               >
-                {isUpdating ? (
-                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                ) : (
-                  'SIMPAN PERUBAHAN'
-                )}
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                </svg>
+                SIMPAN PERUBAHAN
               </button>
               <button 
                 onClick={() => setSelectedStudent(null)} 

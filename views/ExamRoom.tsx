@@ -1,10 +1,9 @@
-
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Student, ExamSession, StudentStatus } from '../types';
 
 interface ExamRoomProps {
   student: Student;
-  students: Student[]; // Menerima data siswa global untuk deteksi status
+  students: Student[]; 
   session: ExamSession;
   onFinish: () => void;
 }
@@ -17,16 +16,39 @@ const ExamRoom: React.FC<ExamRoomProps> = ({ student, students, session, onFinis
   const [isFocusLost, setIsFocusLost] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [iframeKey, setIframeKey] = useState(0); 
+  const [zoomLevel, setZoomLevel] = useState(1);
   
   const videoRef = useRef<HTMLVideoElement>(null);
   const wakeLockRef = useRef<any>(null);
   const lastViolationTime = useRef(0);
 
   const MAX_VIOLATIONS = 3;
+  
+  // Area pemotongan UI Google Drive
+  const CLIPPING_TOP = 120;      
+  const CLIPPING_BOTTOM = 5000;   
+  const CLIPPING_SIDE = 60;      
 
-  // Deteksi jika siswa diblokir oleh proktor di database
   const currentStudentData = students.find(s => String(s.nis) === String(student.nis));
   const isBlocked = currentStudentData?.status === StudentStatus.BLOKIR;
+
+  const sanitizePdfUrl = (url: string) => {
+    if (!url) return '';
+    let sanitized = url;
+    if (url.includes('drive.google.com')) {
+      sanitized = url.replace(/\/view(\?.*)?$/, '/preview');
+      if (!sanitized.includes('/preview')) {
+        sanitized = sanitized.replace(/\/edit(\?.*)?$/, '/preview');
+      }
+      const separator = sanitized.includes('?') ? '&' : '?';
+      sanitized = `${sanitized}${separator}rm=minimal`;
+    }
+    return sanitized;
+  };
+
+  const handleZoom = (delta: number) => {
+    setZoomLevel(prev => Math.min(Math.max(prev + delta, 0.5), 3.0));
+  };
 
   const requestWakeLock = async () => {
     try {
@@ -44,13 +66,38 @@ const ExamRoom: React.FC<ExamRoomProps> = ({ student, students, session, onFinis
   }, []);
 
   const triggerViolation = useCallback((reason: string) => {
-    if (isBlocked) return; // Abaikan jika sudah diblokir
+    if (isBlocked) return;
     const now = Date.now();
     if (now - lastViolationTime.current < 2500) return; 
     lastViolationTime.current = now;
     setIsFocusLost(true);
     setViolations(v => v + 1);
   }, [isBlocked]);
+
+  useEffect(() => {
+    const handleContextMenu = (e: MouseEvent) => e.preventDefault();
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (
+        (e.ctrlKey && (e.key === 'p' || e.key === 's' || e.key === 'u')) ||
+        e.key === 'F12'
+      ) {
+        e.preventDefault();
+        triggerViolation("Unauthorized Shortcut");
+      }
+    };
+
+    window.addEventListener('contextmenu', handleContextMenu);
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('contextmenu', handleContextMenu);
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [triggerViolation]);
+
+  const handleRefreshPDF = () => {
+    setIframeKey(prev => prev + 1);
+    setZoomLevel(1);
+  };
 
   useEffect(() => {
     const handleFsChange = () => setIsFullscreen(!!document.fullscreenElement);
@@ -97,7 +144,6 @@ const ExamRoom: React.FC<ExamRoomProps> = ({ student, students, session, onFinis
     }
   };
 
-  // Otomatis selesai jika pelanggaran maksimal
   useEffect(() => {
     if (violations >= MAX_VIOLATIONS) {
       onFinish();
@@ -108,97 +154,191 @@ const ExamRoom: React.FC<ExamRoomProps> = ({ student, students, session, onFinis
     <div className="flex flex-col h-screen w-screen overflow-hidden select-none bg-slate-950 font-sans relative">
       <video ref={videoRef} className="hidden" aria-hidden="true" muted playsInline />
 
-      {/* MODAL BLOKIR (PRIORITAS TERTINGGI) */}
+      {/* MODAL BLOKIR */}
       {isBlocked && (
-        <div className="fixed inset-0 z-[10000] bg-red-600 flex items-center justify-center p-6 backdrop-blur-xl animate-in fade-in duration-500">
-          <div className="bg-white w-full max-w-sm p-10 rounded-[3rem] text-center shadow-[0_0_100px_rgba(0,0,0,0.5)] animate-gpu">
-            <div className="w-20 h-20 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto mb-6">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M13.477 14.89A6 6 0 015.11 6.524l8.367 8.368zm1.414-1.414L6.524 5.11a6 6 0 018.367 8.367zM18 10a8 8 0 11-16 0 8 8 0 0116 0z" clipRule="evenodd" />
+        <div className="fixed inset-0 z-[10000] bg-red-600 flex items-center justify-center p-6 backdrop-blur-xl">
+          <div className="bg-white w-full max-sm p-10 rounded-[3rem] text-center shadow-2xl">
+            <h2 className="text-2xl font-black text-slate-900 mb-2 uppercase tracking-tighter">Akses Diblokir</h2>
+            <p className="text-slate-500 text-xs font-bold uppercase mb-10">Ujian dihentikan oleh Proktor.</p>
+            <button onClick={() => onFinish()} className="w-full bg-red-600 text-white py-5 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl">KONFIRMASI & KELUAR</button>
+          </div>
+        </div>
+      )}
+
+      {/* OVERLAY CONSENT (START EXAM) */}
+      {!hasConsented && !isBlocked && (
+        <div className="fixed inset-0 z-[1000] bg-slate-950 flex items-center justify-center p-6 backdrop-blur-md">
+          <div className="bg-white w-full max-w-sm p-10 rounded-[3rem] text-center shadow-2xl border-t-8 border-indigo-600">
+            <div className="w-20 h-20 bg-indigo-50 text-indigo-600 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-sm">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
               </svg>
             </div>
-            <h2 className="text-2xl font-black text-slate-900 mb-2 uppercase tracking-tighter">Akses Diblokir</h2>
-            <p className="text-slate-500 text-xs font-bold uppercase tracking-widest mb-10 leading-relaxed">
-              Ujian Anda telah dihentikan oleh Proktor/Admin Ruang. Silakan hubungi pengawas untuk informasi lebih lanjut.
+            <h2 className="text-2xl font-black text-slate-900 mb-3 uppercase tracking-tight leading-none">Konfirmasi Ujian</h2>
+            <p className="text-slate-500 text-[11px] font-medium leading-relaxed mb-10">
+              Sistem akan mengaktifkan <span className="text-indigo-600 font-bold">Mode Proteksi Layar</span> secara otomatis. Pastikan koneksi internet stabil dan jangan keluar dari aplikasi selama ujian berlangsung.
             </p>
-            <button 
-              onClick={() => {
-                if (document.exitFullscreen) document.exitFullscreen().catch(()=>{});
-                onFinish();
-              }} 
-              className="w-full bg-red-600 text-white py-5 rounded-2xl font-black text-xs uppercase tracking-[0.2em] shadow-xl shadow-red-200 active:scale-95 transition-all"
-            >
-              KONFIRMASI & KELUAR
+            <button onClick={startPersistence} className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-5 rounded-2xl font-black text-xs uppercase tracking-[0.15em] shadow-xl shadow-indigo-200 transition-all active:scale-95">
+              Mulai Ujian Sekarang
             </button>
           </div>
         </div>
       )}
 
-      {/* OVERLAY LOADING / CONSENT */}
-      {!hasConsented && !isBlocked && (
-        <div className="fixed inset-0 z-[1000] bg-slate-950 flex items-center justify-center p-6 backdrop-blur-md">
-          <div className="bg-white w-full max-w-sm p-10 rounded-[3rem] text-center shadow-2xl animate-gpu">
-            <h2 className="text-xl font-black text-slate-900 mb-2 uppercase tracking-tight">Kunci Ujian</h2>
-            <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest mb-10 leading-relaxed">Sistem akan mengunci layar ke mode Fullscreen.</p>
-            <button onClick={startPersistence} className="w-full bg-indigo-600 text-white py-4 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl active:scale-95 transition-all">Masuk Ruang Ujian</button>
-          </div>
-        </div>
-      )}
-
-      {/* HEADER */}
-      <header className="h-14 md:h-20 shrink-0 z-50 border-b border-white/5 bg-black/40 backdrop-blur-xl flex items-center px-4 md:px-10">
+      {/* HEADER: Landscape Handphone lebih tipis (h-8) */}
+      <header className="h-14 md:h-16 landscape:h-8 md:landscape:h-16 shrink-0 z-50 border-b border-white/5 bg-black/80 backdrop-blur-2xl flex items-center px-4 md:px-10 landscape:px-3 md:landscape:px-10 transition-all duration-300">
         <div className="flex-1 overflow-hidden">
-          <h2 className="text-white font-black uppercase truncate text-[10px] md:text-sm">{student.name}</h2>
-          <span className="text-indigo-400 font-bold uppercase tracking-widest text-[8px] md:text-[10px]">{student.class} | {student.nis}</span>
+          <h2 className="text-white font-black uppercase truncate text-[10px] md:text-sm landscape:text-[8px] md:landscape:text-sm">{student.name}</h2>
+          <span className="text-indigo-400 font-bold uppercase tracking-widest text-[8px] md:text-[10px] landscape:text-[6px] md:landscape:text-[10px]">Kelas {student.class} | {student.nis}</span>
         </div>
         <div className="flex-1 text-center hidden sm:block">
-          <h1 className="text-white font-black uppercase tracking-tighter truncate text-xs md:text-lg">{session.name}</h1>
+          <h1 className="text-white font-black uppercase tracking-tighter truncate text-xs md:text-lg landscape:text-[9px] md:landscape:text-lg">{session.name}</h1>
         </div>
-        <div className="flex-1 flex items-center justify-end gap-3 md:gap-6">
-          <div className={`font-mono font-black text-xs md:text-lg ${timeLeft < 300 ? 'text-red-500 animate-pulse' : 'text-indigo-400'}`}>
+        <div className="flex-1 flex items-center justify-end gap-3 md:gap-4 landscape:gap-2">
+          <button onClick={handleRefreshPDF} className="p-2 md:p-3 landscape:p-1 md:landscape:p-3 bg-white/5 hover:bg-white/10 text-white rounded-xl border border-white/10 transition-all active:scale-90" title="Refresh Soal">
+            <svg xmlns="http://www.w3.org/2000/svg" className={`h-4 w-4 md:h-5 md:w-5 landscape:h-3 landscape:w-3 md:landscape:h-5 md:landscape:w-5 ${iframeKey > 0 ? 'animate-spin-once' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+          </button>
+          <div className={`font-mono font-black text-sm md:text-lg landscape:text-xs md:landscape:text-lg ${timeLeft < 300 ? 'text-red-500 animate-pulse' : 'text-indigo-400'}`}>
             {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}
           </div>
-          <button onClick={() => setShowConfirm(true)} className="bg-emerald-500 text-white px-4 md:px-8 py-2 md:py-3 rounded-xl font-black uppercase text-[9px] md:text-xs tracking-widest active:scale-90 transition-all">Selesai</button>
+          <button onClick={() => setShowConfirm(true)} className="bg-emerald-500 text-white px-4 md:px-8 landscape:px-3 md:landscape:px-8 py-2 md:py-3 landscape:py-1 md:landscape:py-3 rounded-xl font-black uppercase text-[9px] md:text-xs landscape:text-[7px] md:landscape:text-xs tracking-widest shadow-lg active:scale-90 transition-all">Selesai</button>
         </div>
       </header>
 
       {/* VIEWPORT */}
-      <main className={`flex-1 bg-slate-900 relative transition-all duration-300 ${isFocusLost || isBlocked ? 'blur-3xl pointer-events-none' : ''}`}>
-        {hasConsented && session.pdfUrl && (
-          <iframe key={iframeKey} src={`${session.pdfUrl}#toolbar=0&navpanes=0&view=FitH`} className="w-full h-full border-none" title="Soal PDF" loading="lazy" />
-        )}
-        {/* Watermark anti-cam */}
-        <div className="absolute inset-0 z-50 pointer-events-none opacity-[0.03] overflow-hidden select-none">
-           <div className="flex flex-wrap rotate-12 scale-150">
-             {[...Array(20)].map((_, i) => (
-               <div key={i} className="text-white text-xl font-black p-20 uppercase whitespace-nowrap">{student.nis} {student.name}</div>
+      <main className={`flex-1 bg-slate-900 relative transition-all duration-300 overflow-hidden ${isFocusLost || isBlocked ? 'blur-3xl pointer-events-none' : ''}`}>
+        <div className="w-full h-full overflow-auto scrollbar-hide">
+          <div 
+            className="w-full h-full relative transition-transform duration-300 ease-out origin-top"
+            style={{ transform: `scale(${zoomLevel})` }}
+          >
+            <div 
+              className="relative w-full h-full overflow-hidden" 
+              style={{ 
+                marginTop: `-${CLIPPING_TOP}px`, 
+                marginLeft: `-${CLIPPING_SIDE}px`,
+                width: `calc(100% + ${CLIPPING_SIDE * 2}px)`,
+                height: `calc(100% + ${CLIPPING_TOP + CLIPPING_BOTTOM}px)` 
+              }}
+            >
+              {hasConsented && session.pdfUrl && (
+                <iframe 
+                  key={iframeKey} 
+                  src={sanitizePdfUrl(session.pdfUrl)} 
+                  className="w-full h-full border-none" 
+                  title="Soal PDF" 
+                />
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* FLOATING ZOOM CONTROLS
+            - Desktop: Tengah Bawah (Horizontal)
+            - Handphone Portrait: Kanan Bawah (Vertical)
+            - Handphone Landscape: Sisi Kanan Tengah (Vertical, Transparan)
+        */}
+        <div className="absolute 
+          bottom-6 right-5 flex flex-col 
+          max-md:landscape:top-1/2 max-md:landscape:right-3 max-md:landscape:bottom-auto max-md:landscape:-translate-y-1/2 max-md:landscape:bg-black/20 max-md:landscape:scale-[0.7]
+          md:bottom-10 md:left-1/2 md:right-auto md:top-auto md:translate-y-0 md:-translate-x-1/2 md:flex-row 
+          z-[200] items-center gap-2 p-2 md:p-2.5 bg-black/40 backdrop-blur-xl border border-white/10 rounded-[1.5rem] shadow-2xl opacity-40 hover:opacity-100 transition-all duration-300">
+           
+           <button 
+             onClick={() => handleZoom(0.1)} 
+             className="w-10 h-10 md:w-11 md:h-11 flex items-center justify-center bg-white/5 hover:bg-indigo-600 text-white rounded-xl transition-all active:scale-90"
+             title="Zoom In"
+           >
+             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M12 4v16m8-8H4" />
+             </svg>
+           </button>
+           
+           <div className="px-1 min-w-[50px] md:min-w-[65px] text-center">
+              <span className="text-[10px] md:text-xs font-black text-indigo-400 uppercase tracking-tighter">{Math.round(zoomLevel * 100)}%</span>
+           </div>
+
+           <button 
+             onClick={() => handleZoom(-0.1)} 
+             className="w-10 h-10 md:w-11 md:h-11 flex items-center justify-center bg-white/5 hover:bg-indigo-600 text-white rounded-xl transition-all active:scale-90"
+             title="Zoom Out"
+           >
+             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M20 12H4" />
+             </svg>
+           </button>
+
+           <div className="w-6 h-px md:w-px md:h-6 bg-white/10 my-1 md:my-0 md:mx-2"></div>
+
+           <button 
+             onClick={() => setZoomLevel(1)} 
+             className="w-10 h-10 md:w-auto md:px-5 md:h-11 flex items-center justify-center bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-[9px] md:text-[10px] font-black uppercase tracking-widest shadow-lg transition-all active:scale-95"
+           >
+             <span className="md:hidden">R</span>
+             <span className="hidden md:inline">Reset</span>
+           </button>
+        </div>
+
+        {/* Watermark Anticam */}
+        <div className="absolute inset-0 z-[90] pointer-events-none opacity-[0.03] overflow-hidden">
+           <div className="flex flex-wrap -rotate-[25deg] scale-[3] absolute -inset-[150%] w-[400%] h-[400%] items-center justify-center content-center">
+             {[...Array(200)].map((_, i) => (
+               <div key={i} className="text-white text-[8px] font-black p-12 uppercase tracking-[0.4em]">{student.nis} {student.name}</div>
              ))}
            </div>
         </div>
       </main>
 
-      {/* MODALS */}
+      {/* MODAL FINISH (CONFIRMATION) - UPDATED SIZE & TEXT */}
       {showConfirm && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-6 bg-slate-950/80 backdrop-blur-sm">
-          <div className="bg-white w-full max-w-sm p-10 rounded-[2.5rem] shadow-2xl text-center animate-gpu">
-            <h3 className="text-xl font-black text-slate-900 mb-6 uppercase tracking-tight">Kirim Jawaban?</h3>
+        <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
+          <div className="bg-white w-full max-w-[340px] md:max-w-[400px] p-8 md:p-10 rounded-[2.5rem] shadow-2xl text-center border-t-8 border-emerald-500 animate-in zoom-in-95 duration-200">
+            <div className="w-16 h-16 md:w-20 md:h-20 bg-emerald-50 text-emerald-600 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-sm">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 md:h-10 md:w-10" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+              </svg>
+            </div>
+            <h3 className="text-xl md:text-2xl font-black text-slate-900 mb-3 uppercase tracking-tight leading-none">Akhiri Sesi?</h3>
+            <div className="space-y-3 mb-10">
+              <p className="text-slate-500 text-[11px] md:text-xs font-medium leading-relaxed">
+                Ini adalah ujian <span className="text-indigo-600 font-bold">Semi-Online</span>. Pastikan seluruh jawaban Anda telah disalin ke <span className="text-emerald-600 font-bold">Lembar Jawab Fisik</span>.
+              </p>
+              <p className="text-slate-400 text-[9px] md:text-[10px] font-bold uppercase tracking-wider">
+                Akses soal akan ditutup secara otomatis.
+              </p>
+            </div>
             <div className="flex flex-col gap-3">
-              <button onClick={() => onFinish()} className="w-full bg-indigo-600 text-white py-4 rounded-xl font-black text-[10px] uppercase tracking-widest shadow-lg active:scale-95 transition-all">YA, KIRIM SEKARANG</button>
-              <button onClick={() => setShowConfirm(false)} className="w-full text-slate-400 font-bold py-2 text-[10px] uppercase">Batal</button>
+              <button onClick={() => onFinish()} className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-4 md:py-5 rounded-2xl font-black text-[10px] md:text-[11px] uppercase tracking-[0.15em] shadow-lg shadow-emerald-100 active:scale-95 transition-all">
+                Selesai & Keluar
+              </button>
+              <button onClick={() => setShowConfirm(false)} className="w-full text-slate-400 font-bold py-2 md:py-3 text-[10px] uppercase tracking-[0.1em] hover:text-slate-600 transition-colors">
+                Kembali ke Soal
+              </button>
             </div>
           </div>
         </div>
       )}
 
       {isFocusLost && hasConsented && !isBlocked && (
-        <div className="fixed inset-0 z-[5000] bg-slate-950/90 flex items-center justify-center p-8 backdrop-blur-md">
-          <div className="bg-white w-full max-w-sm p-10 rounded-3xl text-center shadow-2xl animate-gpu">
-            <p className="text-red-500 font-black uppercase text-[10px] mb-2 tracking-widest">Keamanan Aktif</p>
-            <h3 className="text-lg font-black text-slate-900 mb-6">Pelanggaran Terdeteksi ({violations}/{MAX_VIOLATIONS})</h3>
-            <button onClick={() => { setIsFocusLost(false); if(!isFullscreen) document.documentElement.requestFullscreen().catch(()=>{}); }} className="w-full py-4 bg-slate-900 text-white rounded-xl font-black text-[10px] uppercase">Lanjutkan Ujian</button>
+        <div className="fixed inset-0 z-[5000] bg-slate-950/95 flex items-center justify-center p-8 backdrop-blur-xl">
+          <div className="bg-white w-full max-w-sm p-10 rounded-3xl text-center shadow-2xl border-b-8 border-red-500">
+            <div className="w-16 h-16 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto mb-6">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+            </div>
+            <h3 className="text-lg font-black text-slate-900 mb-6 uppercase tracking-tight">Pelanggaran ({violations}/{MAX_VIOLATIONS})</h3>
+            <button onClick={() => { setIsFocusLost(false); if(!isFullscreen) document.documentElement.requestFullscreen().catch(()=>{}); }} className="w-full py-4 bg-slate-900 text-white rounded-xl font-black text-[10px] uppercase shadow-lg">Kembali ke Ujian</button>
           </div>
         </div>
       )}
+
+      <style>{`
+        @keyframes spin-once { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        .animate-spin-once { animation: spin-once 0.6s cubic-bezier(0.4, 0, 0.2, 1); }
+        iframe { pointer-events: auto !important; }
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+      `}</style>
     </div>
   );
 };

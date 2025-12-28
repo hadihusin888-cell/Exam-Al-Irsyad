@@ -22,6 +22,10 @@ const App: React.FC = () => {
   const [hasError, setHasError] = useState(false);
   const [errorDetail, setErrorDetail] = useState('');
 
+  const [students, setStudents] = useState<Student[]>([]);
+  const [sessions, setSessions] = useState<ExamSession[]>([]);
+  const [rooms, setRooms] = useState<Room[]>([]);
+
   const loadAllData = async () => {
     if (!GAS_URL) return;
     
@@ -50,10 +54,6 @@ const App: React.FC = () => {
     setIsSyncing(false);
   };
 
-  const [students, setStudents] = useState<Student[]>([]);
-  const [sessions, setSessions] = useState<ExamSession[]>([]);
-  const [rooms, setRooms] = useState<Room[]>([]);
-
   useEffect(() => {
     loadAllData();
     const intervalTime = (view === 'EXAM_ROOM' || view === 'PROCTOR_DASHBOARD' || view === 'ADMIN_DASHBOARD') ? 15000 : 60000;
@@ -64,9 +64,24 @@ const App: React.FC = () => {
   }, [view]);
 
   const handleAction = async (action: string, payload: any) => {
+    // Optimistic Update: Langsung update state lokal agar UI terasa instan
+    if (action === 'UPDATE_STUDENT') {
+      setStudents(prev => prev.map(s => 
+        String(s.nis) === String(payload.nis) ? { ...s, ...payload } : s
+      ));
+    }
+
     setIsSyncing(true);
     const success = await callCloudAction(GAS_URL, action, payload);
-    if (success) await loadAllData();
+    
+    // Refresh data untuk memastikan state tetap akurat dengan server
+    if (success) {
+      await loadAllData();
+    } else {
+      // Revert/Refresh jika gagal
+      await loadAllData();
+    }
+    
     setIsSyncing(false);
     return success;
   };
