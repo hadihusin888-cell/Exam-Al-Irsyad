@@ -185,7 +185,7 @@ const ExamRoom: React.FC<ExamRoomProps> = ({ student, students, session, onFinis
         </div>
       )}
 
-      {/* HEADER: Landscape Handphone lebih tipis (h-7) */}
+      {/* HEADER: Sangat tipis di mode landscape (h-7) */}
       <header className="h-14 md:h-16 landscape:h-7 md:landscape:h-16 shrink-0 z-50 border-b border-white/5 bg-black/80 backdrop-blur-2xl flex items-center px-4 md:px-10 landscape:px-3 md:landscape:px-10 transition-all duration-300">
         <div className="flex-1 overflow-hidden">
           <h2 className="text-white font-black uppercase truncate text-[10px] md:text-sm landscape:text-[7px] md:landscape:text-sm">{student.name}</h2>
@@ -238,7 +238,7 @@ const ExamRoom: React.FC<ExamRoomProps> = ({ student, students, session, onFinis
         {/* FLOATING ZOOM CONTROLS
             - Desktop: Tengah Bawah (Horizontal)
             - Handphone Portrait: Kanan Bawah (Vertical, scale-80)
-            - Handphone Landscape: Sisi Kanan Tengah (Vertical, Transparan, scale-65)
+            - Handphone Landscape: Sisi Kanan Tengah (Vertical, Transparan, scale-65) - DIPERBAIKI
         */}
         <div className="absolute 
           bottom-6 right-4 flex flex-col 
