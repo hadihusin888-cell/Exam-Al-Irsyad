@@ -185,25 +185,25 @@ const ExamRoom: React.FC<ExamRoomProps> = ({ student, students, session, onFinis
         </div>
       )}
 
-      {/* HEADER: Landscape Handphone lebih tipis (h-8) */}
-      <header className="h-14 md:h-16 landscape:h-8 md:landscape:h-16 shrink-0 z-50 border-b border-white/5 bg-black/80 backdrop-blur-2xl flex items-center px-4 md:px-10 landscape:px-3 md:landscape:px-10 transition-all duration-300">
+      {/* HEADER: Landscape Handphone lebih tipis (h-7) */}
+      <header className="h-14 md:h-16 landscape:h-7 md:landscape:h-16 shrink-0 z-50 border-b border-white/5 bg-black/80 backdrop-blur-2xl flex items-center px-4 md:px-10 landscape:px-3 md:landscape:px-10 transition-all duration-300">
         <div className="flex-1 overflow-hidden">
-          <h2 className="text-white font-black uppercase truncate text-[10px] md:text-sm landscape:text-[8px] md:landscape:text-sm">{student.name}</h2>
-          <span className="text-indigo-400 font-bold uppercase tracking-widest text-[8px] md:text-[10px] landscape:text-[6px] md:landscape:text-[10px]">Kelas {student.class} | {student.nis}</span>
+          <h2 className="text-white font-black uppercase truncate text-[10px] md:text-sm landscape:text-[7px] md:landscape:text-sm">{student.name}</h2>
+          <span className="text-indigo-400 font-bold uppercase tracking-widest text-[8px] md:text-[10px] landscape:text-[5px] md:landscape:text-[10px]">Kelas {student.class} | {student.nis}</span>
         </div>
         <div className="flex-1 text-center hidden sm:block">
-          <h1 className="text-white font-black uppercase tracking-tighter truncate text-xs md:text-lg landscape:text-[9px] md:landscape:text-lg">{session.name}</h1>
+          <h1 className="text-white font-black uppercase tracking-tighter truncate text-xs md:text-lg landscape:text-[8px] md:landscape:text-lg">{session.name}</h1>
         </div>
-        <div className="flex-1 flex items-center justify-end gap-3 md:gap-4 landscape:gap-2">
-          <button onClick={handleRefreshPDF} className="p-2 md:p-3 landscape:p-1 md:landscape:p-3 bg-white/5 hover:bg-white/10 text-white rounded-xl border border-white/10 transition-all active:scale-90" title="Refresh Soal">
-            <svg xmlns="http://www.w3.org/2000/svg" className={`h-4 w-4 md:h-5 md:w-5 landscape:h-3 landscape:w-3 md:landscape:h-5 md:landscape:w-5 ${iframeKey > 0 ? 'animate-spin-once' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <div className="flex-1 flex items-center justify-end gap-3 md:gap-4 landscape:gap-1.5">
+          <button onClick={handleRefreshPDF} className="p-2 md:p-3 landscape:p-0.5 md:landscape:p-3 bg-white/5 hover:bg-white/10 text-white rounded-xl border border-white/10 transition-all active:scale-90" title="Refresh Soal">
+            <svg xmlns="http://www.w3.org/2000/svg" className={`h-4 w-4 md:h-5 md:w-5 landscape:h-2.5 landscape:w-2.5 md:landscape:h-5 md:landscape:w-5 ${iframeKey > 0 ? 'animate-spin-once' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
             </svg>
           </button>
-          <div className={`font-mono font-black text-sm md:text-lg landscape:text-xs md:landscape:text-lg ${timeLeft < 300 ? 'text-red-500 animate-pulse' : 'text-indigo-400'}`}>
+          <div className={`font-mono font-black text-sm md:text-lg landscape:text-[9px] md:landscape:text-lg ${timeLeft < 300 ? 'text-red-500 animate-pulse' : 'text-indigo-400'}`}>
             {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}
           </div>
-          <button onClick={() => setShowConfirm(true)} className="bg-emerald-500 text-white px-4 md:px-8 landscape:px-3 md:landscape:px-8 py-2 md:py-3 landscape:py-1 md:landscape:py-3 rounded-xl font-black uppercase text-[9px] md:text-xs landscape:text-[7px] md:landscape:text-xs tracking-widest shadow-lg active:scale-90 transition-all">Selesai</button>
+          <button onClick={() => setShowConfirm(true)} className="bg-emerald-500 text-white px-4 md:px-8 landscape:px-2 md:landscape:px-8 py-2 md:py-3 landscape:py-0.5 md:landscape:py-3 rounded-xl font-black uppercase text-[9px] md:text-xs landscape:text-[6px] md:landscape:text-xs tracking-widest shadow-lg active:scale-90 transition-all">Selesai</button>
         </div>
       </header>
 
@@ -237,12 +237,13 @@ const ExamRoom: React.FC<ExamRoomProps> = ({ student, students, session, onFinis
 
         {/* FLOATING ZOOM CONTROLS
             - Desktop: Tengah Bawah (Horizontal)
-            - Handphone Portrait: Kanan Bawah (Vertical)
-            - Handphone Landscape: Sisi Kanan Tengah (Vertical, Transparan)
+            - Handphone Portrait: Kanan Bawah (Vertical, scale-80)
+            - Handphone Landscape: Sisi Kanan Tengah (Vertical, Transparan, scale-65)
         */}
         <div className="absolute 
-          bottom-6 right-5 flex flex-col 
-          max-md:landscape:top-1/2 max-md:landscape:right-3 max-md:landscape:bottom-auto max-md:landscape:-translate-y-1/2 max-md:landscape:bg-black/20 max-md:landscape:scale-[0.7]
+          bottom-6 right-4 flex flex-col 
+          max-md:scale-[0.8] max-md:bottom-4 max-md:right-3
+          max-md:landscape:top-1/2 max-md:landscape:right-2 max-md:landscape:bottom-auto max-md:landscape:-translate-y-1/2 max-md:landscape:bg-black/10 max-md:landscape:scale-[0.65] max-md:landscape:p-1.5
           md:bottom-10 md:left-1/2 md:right-auto md:top-auto md:translate-y-0 md:-translate-x-1/2 md:flex-row 
           z-[200] items-center gap-2 p-2 md:p-2.5 bg-black/40 backdrop-blur-xl border border-white/10 rounded-[1.5rem] shadow-2xl opacity-40 hover:opacity-100 transition-all duration-300">
            
@@ -291,29 +292,29 @@ const ExamRoom: React.FC<ExamRoomProps> = ({ student, students, session, onFinis
         </div>
       </main>
 
-      {/* MODAL FINISH (CONFIRMATION) - UPDATED SIZE & TEXT */}
+      {/* MODAL FINISH (CONFIRMATION) - OPTIMIZED FOR MOBILE */}
       {showConfirm && (
         <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
-          <div className="bg-white w-full max-w-[340px] md:max-w-[400px] p-8 md:p-10 rounded-[2.5rem] shadow-2xl text-center border-t-8 border-emerald-500 animate-in zoom-in-95 duration-200">
-            <div className="w-16 h-16 md:w-20 md:h-20 bg-emerald-50 text-emerald-600 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-sm">
+          <div className="bg-white w-full max-w-[320px] md:max-w-[400px] p-8 md:p-10 rounded-[2.5rem] shadow-2xl text-center border-t-8 border-emerald-500 animate-in zoom-in-95 duration-200">
+            <div className="w-16 h-16 md:w-20 md:h-20 bg-emerald-50 text-emerald-600 rounded-3xl flex items-center justify-center mx-auto mb-5 shadow-sm">
               <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 md:h-10 md:w-10" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
               </svg>
             </div>
-            <h3 className="text-xl md:text-2xl font-black text-slate-900 mb-3 uppercase tracking-tight leading-none">Akhiri Sesi?</h3>
-            <div className="space-y-3 mb-10">
-              <p className="text-slate-500 text-[11px] md:text-xs font-medium leading-relaxed">
-                Ini adalah ujian <span className="text-indigo-600 font-bold">Semi-Online</span>. Pastikan seluruh jawaban Anda telah disalin ke <span className="text-emerald-600 font-bold">Lembar Jawab Fisik</span>.
+            <h3 className="text-xl md:text-2xl font-black text-slate-900 mb-2 uppercase tracking-tight leading-none">Akhiri Sesi?</h3>
+            <div className="space-y-3 mb-8">
+              <p className="text-slate-500 text-[10px] md:text-xs font-medium leading-relaxed">
+                Ini adalah ujian <span className="text-indigo-600 font-bold">Semi-Online</span>. Pastikan seluruh jawaban Anda telah disalin ke <span className="text-emerald-600 font-bold underline">Lembar Jawab Fisik</span>.
               </p>
               <p className="text-slate-400 text-[9px] md:text-[10px] font-bold uppercase tracking-wider">
                 Akses soal akan ditutup secara otomatis.
               </p>
             </div>
-            <div className="flex flex-col gap-3">
+            <div className="flex flex-col gap-2.5">
               <button onClick={() => onFinish()} className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-4 md:py-5 rounded-2xl font-black text-[10px] md:text-[11px] uppercase tracking-[0.15em] shadow-lg shadow-emerald-100 active:scale-95 transition-all">
                 Selesai & Keluar
               </button>
-              <button onClick={() => setShowConfirm(false)} className="w-full text-slate-400 font-bold py-2 md:py-3 text-[10px] uppercase tracking-[0.1em] hover:text-slate-600 transition-colors">
+              <button onClick={() => setShowConfirm(false)} className="w-full text-slate-400 font-bold py-2 md:py-3 text-[9px] md:text-[10px] uppercase tracking-[0.1em] hover:text-slate-600 transition-colors">
                 Kembali ke Soal
               </button>
             </div>
