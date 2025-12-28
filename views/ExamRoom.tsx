@@ -18,19 +18,63 @@ const ExamRoom: React.FC<ExamRoomProps> = ({ student, students, session, onFinis
   const [iframeKey, setIframeKey] = useState(0); 
   const [zoomLevel, setZoomLevel] = useState(1);
   
+  // State untuk transparansi kontrol zoom
+  const [isZoomVisible, setIsZoomVisible] = useState(true);
+  
+  // ReturnType<typeof setTimeout> untuk menghindari namespace errors di browser environment
+  const zoomTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Script deteksi mobile landscape
+  const [isMobileLandscape, setIsMobileLandscape] = useState(false);
+
   const videoRef = useRef<HTMLVideoElement>(null);
   const wakeLockRef = useRef<any>(null);
   const lastViolationTime = useRef(0);
 
   const MAX_VIOLATIONS = 3;
   
-  // Area pemotongan UI Google Drive
   const CLIPPING_TOP = 120;      
   const CLIPPING_BOTTOM = 5000;   
   const CLIPPING_SIDE = 60;      
 
   const currentStudentData = students.find(s => String(s.nis) === String(student.nis));
   const isBlocked = currentStudentData?.status === StudentStatus.BLOKIR;
+
+  // Fungsi untuk me-reset timer transparansi zoom
+  const resetZoomTimer = useCallback(() => {
+    setIsZoomVisible(true);
+    if (zoomTimerRef.current) clearTimeout(zoomTimerRef.current);
+    zoomTimerRef.current = setTimeout(() => {
+      setIsZoomVisible(false);
+    }, 3000);
+  }, []);
+
+  // Reset timer saat pertama kali render setelah ujian dimulai
+  useEffect(() => {
+    if (hasConsented) {
+      resetZoomTimer();
+    }
+    return () => {
+      if (zoomTimerRef.current) clearTimeout(zoomTimerRef.current);
+    };
+  }, [hasConsented, resetZoomTimer]);
+
+  // Fungsi deteksi device & orientasi
+  const checkMobileLandscape = useCallback(() => {
+    const isLandscape = window.innerWidth > window.innerHeight;
+    const isMobileHeight = window.innerHeight <= 500;
+    setIsMobileLandscape(isLandscape && isMobileHeight);
+  }, []);
+
+  useEffect(() => {
+    checkMobileLandscape();
+    window.addEventListener('resize', checkMobileLandscape);
+    window.addEventListener('orientationchange', checkMobileLandscape);
+    return () => {
+      window.removeEventListener('resize', checkMobileLandscape);
+      window.removeEventListener('orientationchange', checkMobileLandscape);
+    };
+  }, [checkMobileLandscape]);
 
   const sanitizePdfUrl = (url: string) => {
     if (!url) return '';
@@ -48,6 +92,7 @@ const ExamRoom: React.FC<ExamRoomProps> = ({ student, students, session, onFinis
 
   const handleZoom = (delta: number) => {
     setZoomLevel(prev => Math.min(Math.max(prev + delta, 0.5), 3.0));
+    resetZoomTimer();
   };
 
   const requestWakeLock = async () => {
@@ -97,6 +142,7 @@ const ExamRoom: React.FC<ExamRoomProps> = ({ student, students, session, onFinis
   const handleRefreshPDF = () => {
     setIframeKey(prev => prev + 1);
     setZoomLevel(1);
+    resetZoomTimer();
   };
 
   useEffect(() => {
@@ -151,7 +197,11 @@ const ExamRoom: React.FC<ExamRoomProps> = ({ student, students, session, onFinis
   }, [violations, onFinish]);
 
   return (
-    <div className="flex flex-col h-screen w-screen overflow-hidden select-none bg-slate-950 font-sans relative">
+    <div 
+      className="flex flex-col h-[100dvh] w-screen overflow-hidden select-none bg-slate-950 font-sans relative"
+      onClick={resetZoomTimer}
+      onTouchStart={resetZoomTimer}
+    >
       <video ref={videoRef} className="hidden" aria-hidden="true" muted playsInline />
 
       {/* MODAL BLOKIR */}
@@ -165,7 +215,7 @@ const ExamRoom: React.FC<ExamRoomProps> = ({ student, students, session, onFinis
         </div>
       )}
 
-      {/* OVERLAY CONSENT (START EXAM) */}
+      {/* OVERLAY START */}
       {!hasConsented && !isBlocked && (
         <div className="fixed inset-0 z-[1000] bg-slate-950 flex items-center justify-center p-6 backdrop-blur-md">
           <div className="bg-white w-full max-w-sm p-10 rounded-[3rem] text-center shadow-2xl border-t-8 border-indigo-600">
@@ -185,100 +235,66 @@ const ExamRoom: React.FC<ExamRoomProps> = ({ student, students, session, onFinis
         </div>
       )}
 
-      {/* HEADER: Sangat tipis di mode landscape (h-7) */}
-      <header className="h-14 md:h-16 landscape:h-7 md:landscape:h-16 shrink-0 z-50 border-b border-white/5 bg-black/80 backdrop-blur-2xl flex items-center px-4 md:px-10 landscape:px-3 md:landscape:px-10 transition-all duration-300">
+      {/* HEADER */}
+      <header className={`shrink-0 z-50 border-b border-white/5 bg-black/80 backdrop-blur-2xl flex items-center px-4 md:px-10 transition-all duration-300 ${isMobileLandscape ? 'h-8 px-3' : 'h-14 md:h-16'}`}>
         <div className="flex-1 overflow-hidden">
-          <h2 className="text-white font-black uppercase truncate text-[10px] md:text-sm landscape:text-[7px] md:landscape:text-sm">{student.name}</h2>
-          <span className="text-indigo-400 font-bold uppercase tracking-widest text-[8px] md:text-[10px] landscape:text-[5px] md:landscape:text-[10px]">Kelas {student.class} | {student.nis}</span>
+          <h2 className={`text-white font-black uppercase truncate ${isMobileLandscape ? 'text-[8px]' : 'text-[10px] md:text-sm'}`}>{student.name}</h2>
+          <span className={`text-indigo-400 font-bold uppercase tracking-widest ${isMobileLandscape ? 'text-[6px]' : 'text-[8px] md:text-[10px]'}`}>Kelas {student.class} | {student.nis}</span>
         </div>
-        <div className="flex-1 text-center hidden sm:block">
-          <h1 className="text-white font-black uppercase tracking-tighter truncate text-xs md:text-lg landscape:text-[8px] md:landscape:text-lg">{session.name}</h1>
+        <div className={`flex-1 text-center ${isMobileLandscape ? 'hidden' : 'hidden sm:block'}`}>
+          <h1 className="text-white font-black uppercase tracking-tighter truncate text-xs md:text-lg">{session.name}</h1>
         </div>
-        <div className="flex-1 flex items-center justify-end gap-3 md:gap-4 landscape:gap-1.5">
-          <button onClick={handleRefreshPDF} className="p-2 md:p-3 landscape:p-0.5 md:landscape:p-3 bg-white/5 hover:bg-white/10 text-white rounded-xl border border-white/10 transition-all active:scale-90" title="Refresh Soal">
-            <svg xmlns="http://www.w3.org/2000/svg" className={`h-4 w-4 md:h-5 md:w-5 landscape:h-2.5 landscape:w-2.5 md:landscape:h-5 md:landscape:w-5 ${iframeKey > 0 ? 'animate-spin-once' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <div className={`flex-1 flex items-center justify-end transition-all ${isMobileLandscape ? 'gap-2' : 'gap-3 md:gap-4'}`}>
+          <button onClick={handleRefreshPDF} className={`bg-white/5 hover:bg-white/10 text-white rounded-xl border border-white/10 transition-all active:scale-90 ${isMobileLandscape ? 'p-1' : 'p-2 md:p-3'}`} title="Refresh Soal">
+            <svg xmlns="http://www.w3.org/2000/svg" className={`${isMobileLandscape ? 'h-3 w-3' : 'h-4 w-4 md:h-5 md:w-5'} ${iframeKey > 0 ? 'animate-spin-once' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
             </svg>
           </button>
-          <div className={`font-mono font-black text-sm md:text-lg landscape:text-[9px] md:landscape:text-lg ${timeLeft < 300 ? 'text-red-500 animate-pulse' : 'text-indigo-400'}`}>
+          <div className={`font-mono font-black ${isMobileLandscape ? 'text-xs' : 'text-sm md:text-lg'} ${timeLeft < 300 ? 'text-red-500 animate-pulse' : 'text-indigo-400'}`}>
             {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}
           </div>
-          <button onClick={() => setShowConfirm(true)} className="bg-emerald-500 text-white px-4 md:px-8 landscape:px-2 md:landscape:px-8 py-2 md:py-3 landscape:py-0.5 md:landscape:py-3 rounded-xl font-black uppercase text-[9px] md:text-xs landscape:text-[6px] md:landscape:text-xs tracking-widest shadow-lg active:scale-90 transition-all">Selesai</button>
+          <button onClick={() => setShowConfirm(true)} className={`bg-emerald-500 text-white rounded-xl font-black uppercase tracking-widest shadow-lg active:scale-90 transition-all ${isMobileLandscape ? 'px-3 py-1 text-[7px]' : 'px-4 md:px-8 py-2 md:py-3 text-[9px] md:text-xs'}`}>Selesai</button>
         </div>
       </header>
 
-      {/* VIEWPORT */}
       <main className={`flex-1 bg-slate-900 relative transition-all duration-300 overflow-hidden ${isFocusLost || isBlocked ? 'blur-3xl pointer-events-none' : ''}`}>
         <div className="w-full h-full overflow-auto scrollbar-hide">
-          <div 
-            className="w-full h-full relative transition-transform duration-300 ease-out origin-top"
-            style={{ transform: `scale(${zoomLevel})` }}
-          >
-            <div 
-              className="relative w-full h-full overflow-hidden" 
-              style={{ 
-                marginTop: `-${CLIPPING_TOP}px`, 
-                marginLeft: `-${CLIPPING_SIDE}px`,
-                width: `calc(100% + ${CLIPPING_SIDE * 2}px)`,
-                height: `calc(100% + ${CLIPPING_TOP + CLIPPING_BOTTOM}px)` 
-              }}
-            >
+          <div className="w-full h-full relative transition-transform duration-300 ease-out origin-top" style={{ transform: `scale(${zoomLevel})` }}>
+            <div className="relative w-full h-full overflow-hidden" style={{ marginTop: `-${CLIPPING_TOP}px`, marginLeft: `-${CLIPPING_SIDE}px`, width: `calc(100% + ${CLIPPING_SIDE * 2}px)`, height: `calc(100% + ${CLIPPING_TOP + CLIPPING_BOTTOM}px)` }}>
               {hasConsented && session.pdfUrl && (
-                <iframe 
-                  key={iframeKey} 
-                  src={sanitizePdfUrl(session.pdfUrl)} 
-                  className="w-full h-full border-none" 
-                  title="Soal PDF" 
-                />
+                <iframe key={iframeKey} src={sanitizePdfUrl(session.pdfUrl)} className="w-full h-full border-none" title="Soal PDF" />
               )}
             </div>
           </div>
         </div>
 
-        {/* FLOATING ZOOM CONTROLS
-            - Desktop: Tengah Bawah (Horizontal)
-            - Handphone Portrait: Kanan Bawah (Vertical, scale-80)
-            - Handphone Landscape: Sisi Kanan Tengah (Vertical, Transparan, scale-65) - DIPERBAIKI
-        */}
-        <div className="absolute 
-          bottom-6 right-4 flex flex-col 
-          max-md:scale-[0.8] max-md:bottom-4 max-md:right-3
-          max-md:landscape:top-1/2 max-md:landscape:right-2 max-md:landscape:bottom-auto max-md:landscape:-translate-y-1/2 max-md:landscape:bg-black/10 max-md:landscape:scale-[0.65] max-md:landscape:p-1.5
-          md:bottom-10 md:left-1/2 md:right-auto md:top-auto md:translate-y-0 md:-translate-x-1/2 md:flex-row 
-          z-[200] items-center gap-2 p-2 md:p-2.5 bg-black/40 backdrop-blur-xl border border-white/10 rounded-[1.5rem] shadow-2xl opacity-40 hover:opacity-100 transition-all duration-300">
+        {/* FLOATING ZOOM CONTROLS - Dengan efek transparansi otomatis (opacity-15) dan tetap bisa ditekan */}
+        <div className={`absolute transition-all duration-500 z-[200] items-center flex bg-black/40 backdrop-blur-xl border border-white/10 rounded-[1.5rem] shadow-2xl transition-opacity pointer-events-auto
+          ${isZoomVisible ? 'opacity-40 hover:opacity-100' : 'opacity-[0.15] hover:opacity-100'}
+          ${isMobileLandscape 
+            ? 'top-1/2 right-2 bottom-auto translate-y-[-50%] flex-col scale-[0.65] p-1.5' 
+            : 'bottom-6 right-4 flex-col md:bottom-10 md:left-1/2 md:right-auto md:translate-x-[-50%] md:flex-row md:scale-100 max-md:scale-[0.8] max-md:bottom-4 p-2'}`}>
            
-           <button 
-             onClick={() => handleZoom(0.1)} 
-             className="w-10 h-10 md:w-11 md:h-11 flex items-center justify-center bg-white/5 hover:bg-indigo-600 text-white rounded-xl transition-all active:scale-90"
-             title="Zoom In"
-           >
+           <button onClick={(e) => { e.stopPropagation(); handleZoom(0.1); }} className="w-10 h-10 md:w-11 md:h-11 flex items-center justify-center bg-white/5 hover:bg-indigo-600 text-white rounded-xl transition-all active:scale-90">
              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M12 4v16m8-8H4" />
              </svg>
            </button>
            
-           <div className="px-1 min-w-[50px] md:min-w-[65px] text-center">
-              <span className="text-[10px] md:text-xs font-black text-indigo-400 uppercase tracking-tighter">{Math.round(zoomLevel * 100)}%</span>
+           <div className="px-1 min-w-[50px] md:min-w-[60px] text-center">
+              <span className="text-[10px] md:text-xs font-black text-indigo-400 uppercase">{Math.round(zoomLevel * 100)}%</span>
            </div>
 
-           <button 
-             onClick={() => handleZoom(-0.1)} 
-             className="w-10 h-10 md:w-11 md:h-11 flex items-center justify-center bg-white/5 hover:bg-indigo-600 text-white rounded-xl transition-all active:scale-90"
-             title="Zoom Out"
-           >
+           <button onClick={(e) => { e.stopPropagation(); handleZoom(-0.1); }} className="w-10 h-10 md:w-11 md:h-11 flex items-center justify-center bg-white/5 hover:bg-indigo-600 text-white rounded-xl transition-all active:scale-90">
              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M20 12H4" />
              </svg>
            </button>
 
-           <div className="w-6 h-px md:w-px md:h-6 bg-white/10 my-1 md:my-0 md:mx-2"></div>
+           <div className={`bg-white/10 my-1 md:my-0 md:mx-2 ${isMobileLandscape ? 'w-6 h-px' : 'w-6 h-px md:w-px md:h-6'}`}></div>
 
-           <button 
-             onClick={() => setZoomLevel(1)} 
-             className="w-10 h-10 md:w-auto md:px-5 md:h-11 flex items-center justify-center bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-[9px] md:text-[10px] font-black uppercase tracking-widest shadow-lg transition-all active:scale-95"
-           >
-             <span className="md:hidden">R</span>
-             <span className="hidden md:inline">Reset</span>
+           <button onClick={(e) => { e.stopPropagation(); setZoomLevel(1); resetZoomTimer(); }} className="w-10 h-10 md:px-5 md:h-11 flex items-center justify-center bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-[9px] font-black uppercase tracking-widest transition-all">
+             <span className="md:inline hidden">Reset</span><span className="md:hidden">R</span>
            </button>
         </div>
 
@@ -292,11 +308,11 @@ const ExamRoom: React.FC<ExamRoomProps> = ({ student, students, session, onFinis
         </div>
       </main>
 
-      {/* MODAL FINISH (CONFIRMATION) - OPTIMIZED FOR MOBILE */}
+      {/* MODAL FINISH */}
       {showConfirm && (
         <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
           <div className="bg-white w-full max-w-[320px] md:max-w-[400px] p-8 md:p-10 rounded-[2.5rem] shadow-2xl text-center border-t-8 border-emerald-500 animate-in zoom-in-95 duration-200">
-            <div className="w-16 h-16 md:w-20 md:h-20 bg-emerald-50 text-emerald-600 rounded-3xl flex items-center justify-center mx-auto mb-5 shadow-sm">
+            <div className="w-16 h-16 bg-emerald-50 text-emerald-600 rounded-3xl flex items-center justify-center mx-auto mb-5 shadow-sm">
               <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 md:h-10 md:w-10" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
               </svg>
@@ -305,9 +321,6 @@ const ExamRoom: React.FC<ExamRoomProps> = ({ student, students, session, onFinis
             <div className="space-y-3 mb-8">
               <p className="text-slate-500 text-[10px] md:text-xs font-medium leading-relaxed">
                 Ini adalah ujian <span className="text-indigo-600 font-bold">Semi-Online</span>. Pastikan seluruh jawaban Anda telah disalin ke <span className="text-emerald-600 font-bold underline">Lembar Jawab Fisik</span>.
-              </p>
-              <p className="text-slate-400 text-[9px] md:text-[10px] font-bold uppercase tracking-wider">
-                Akses soal akan ditutup secara otomatis.
               </p>
             </div>
             <div className="flex flex-col gap-2.5">
