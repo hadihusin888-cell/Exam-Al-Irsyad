@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useMemo } from 'react';
 import { ExamSession, Student, StudentStatus, Room } from '../types';
 
@@ -7,12 +6,13 @@ interface AdminDashboardProps {
   students: Student[];
   rooms: Room[];
   isSyncing: boolean;
+  isProcessing?: boolean;
   onLogout: () => void;
   onAction: (action: string, payload: any) => Promise<boolean>;
 }
 
 const AdminDashboard: React.FC<AdminDashboardProps> = ({ 
-  sessions, students, rooms, isSyncing, onLogout, onAction 
+  sessions, students, rooms, isSyncing, isProcessing = false, onLogout, onAction 
 }) => {
   const [activeTab, setActiveTab] = useState<'SESSIONS' | 'STUDENTS' | 'ROOMS'>('SESSIONS');
   
@@ -369,7 +369,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
             <div className="space-y-6">
                <div className="space-y-1.5">
                   <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Pindahkan ke Ruang</label>
-                  <select value={targetBulkRoomId} onChange={e => setTargetBulkRoomId(e.target.value)} className="w-full px-5 py-3.5 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-bold outline-none">
+                  <select value={targetBulkRoomId} disabled={isProcessing} onChange={e => setTargetBulkRoomId(e.target.value)} className="w-full px-5 py-3.5 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-bold outline-none">
                      <option value="KEEP">Jangan Ubah Ruang</option>
                      <option value="">Hapus dari Ruang</option>
                      {rooms.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
@@ -378,15 +378,18 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                
                <div className="space-y-1.5">
                   <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Ubah Status Menjadi</label>
-                  <select value={targetBulkStatus} onChange={e => setTargetBulkStatus(e.target.value)} className="w-full px-5 py-3.5 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-bold outline-none">
+                  <select value={targetBulkStatus} disabled={isProcessing} onChange={e => setTargetBulkStatus(e.target.value)} className="w-full px-5 py-3.5 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-bold outline-none">
                      <option value="KEEP">Jangan Ubah Status</option>
                      {Object.values(StudentStatus).map(s => <option key={s} value={s}>{s.replace('_', ' ')}</option>)}
                   </select>
                </div>
                
                <div className="pt-6 flex flex-col gap-2">
-                  <button onClick={handleBulkUpdate} className="w-full bg-indigo-600 text-white py-4 rounded-2xl font-black uppercase text-xs tracking-widest shadow-lg">TERAPKAN PERUBAHAN</button>
-                  <button onClick={() => setShowBulkModal(false)} className="w-full text-slate-400 py-2 font-bold uppercase text-[10px]">Batal</button>
+                  <button onClick={handleBulkUpdate} disabled={isProcessing} className="w-full bg-indigo-600 disabled:bg-indigo-400 text-white py-4 rounded-2xl font-black uppercase text-xs tracking-widest shadow-lg flex items-center justify-center gap-2">
+                    {isProcessing && <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>}
+                    {isProcessing ? 'Memproses...' : 'TERAPKAN PERUBAHAN'}
+                  </button>
+                  <button onClick={() => setShowBulkModal(false)} disabled={isProcessing} className="w-full text-slate-400 py-2 font-bold uppercase text-[10px]">Batal</button>
                </div>
             </div>
           </div>
@@ -414,21 +417,21 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5">
                   <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">NIS</label>
-                  <input name="nis" defaultValue={studentToEdit?.nis} readOnly={!!studentToEdit} required placeholder="NIS" className="w-full px-5 py-3.5 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-bold uppercase outline-none focus:border-indigo-500" />
+                  <input name="nis" disabled={isProcessing} defaultValue={studentToEdit?.nis} readOnly={!!studentToEdit} required placeholder="NIS" className="w-full px-5 py-3.5 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-bold uppercase outline-none focus:border-indigo-500 disabled:opacity-70" />
                 </div>
                 <div className="space-y-1.5">
                   <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Password</label>
-                  <input name="password" defaultValue={studentToEdit?.password || 'password123'} required placeholder="PASSWORD" className="w-full px-5 py-3.5 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-bold outline-none focus:border-indigo-500" />
+                  <input name="password" disabled={isProcessing} defaultValue={studentToEdit?.password || 'password123'} required placeholder="PASSWORD" className="w-full px-5 py-3.5 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-bold outline-none focus:border-indigo-500 disabled:opacity-70" />
                 </div>
               </div>
               <div className="space-y-1.5">
                 <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Nama Lengkap</label>
-                <input name="name" defaultValue={studentToEdit?.name} required placeholder="NAMA LENGKAP SISWA" className="w-full px-5 py-3.5 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-bold outline-none focus:border-indigo-500 uppercase" />
+                <input name="name" disabled={isProcessing} defaultValue={studentToEdit?.name} required placeholder="NAMA LENGKAP SISWA" className="w-full px-5 py-3.5 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-bold outline-none focus:border-indigo-500 uppercase disabled:opacity-70" />
               </div>
               <div className="grid grid-cols-3 gap-3">
                 <div className="space-y-1.5">
                   <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Kelas</label>
-                  <select name="class" defaultValue={studentToEdit?.class || '7'} className="w-full px-4 py-3.5 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-bold outline-none focus:border-indigo-500">
+                  <select name="class" disabled={isProcessing} defaultValue={studentToEdit?.class || '7'} className="w-full px-4 py-3.5 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-bold outline-none focus:border-indigo-500 disabled:opacity-70">
                       <option value="7">Kls 7</option>
                       <option value="8">Kls 8</option>
                       <option value="9">Kls 9</option>
@@ -436,14 +439,14 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 </div>
                 <div className="space-y-1.5">
                   <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Ruang</label>
-                  <select name="roomId" defaultValue={studentToEdit?.roomId || ''} className="w-full px-4 py-3.5 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-bold outline-none focus:border-indigo-500">
+                  <select name="roomId" disabled={isProcessing} defaultValue={studentToEdit?.roomId || ''} className="w-full px-4 py-3.5 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-bold outline-none focus:border-indigo-500 disabled:opacity-70">
                       <option value="">Kosong</option>
                       {rooms.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
                   </select>
                 </div>
                 <div className="space-y-1.5">
                   <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Status</label>
-                  <select name="status" defaultValue={studentToEdit?.status || StudentStatus.BELUM_MASUK} className="w-full px-4 py-3.5 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-bold outline-none focus:border-indigo-500">
+                  <select name="status" disabled={isProcessing} defaultValue={studentToEdit?.status || StudentStatus.BELUM_MASUK} className="w-full px-4 py-3.5 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-bold outline-none focus:border-indigo-500 disabled:opacity-70">
                       {Object.values(StudentStatus).map(s => (
                         <option key={s} value={s}>{s.replace('_', ' ')}</option>
                       ))}
@@ -451,8 +454,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 </div>
               </div>
               <div className="pt-6 flex flex-col gap-2">
-                 <button type="submit" className="w-full bg-indigo-600 text-white py-4 rounded-2xl font-black uppercase text-xs tracking-widest shadow-lg">SIMPAN DATA</button>
-                 <button type="button" onClick={() => { setStudentToEdit(null); setStudentToAdd(false); }} className="w-full text-slate-400 py-2 font-bold uppercase text-[10px]">Batal</button>
+                 <button type="submit" disabled={isProcessing} className="w-full bg-indigo-600 disabled:bg-indigo-400 text-white py-4 rounded-2xl font-black uppercase text-xs tracking-widest shadow-lg flex items-center justify-center gap-2">
+                   {isProcessing && <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>}
+                   {isProcessing ? 'Menyimpan...' : 'SIMPAN DATA'}
+                 </button>
+                 <button type="button" onClick={() => { setStudentToEdit(null); setStudentToAdd(false); }} disabled={isProcessing} className="w-full text-slate-400 py-2 font-bold uppercase text-[10px]">Batal</button>
               </div>
             </form>
           </div>
@@ -462,7 +468,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
       {(showAddSession || sessionToEdit) && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
           <div className="bg-white w-full max-w-lg p-10 rounded-[3rem] shadow-2xl animate-in zoom-in-95 overflow-hidden relative">
-            {/* Background design element */}
             <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-50 rounded-bl-[4rem] -mr-10 -mt-10 opacity-50"></div>
             
             <div className="relative z-10">
@@ -498,10 +503,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   <label className="block text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] ml-1">Nama Mata Pelajaran / Ujian</label>
                   <input 
                     name="name" 
+                    disabled={isProcessing}
                     defaultValue={sessionToEdit?.name} 
                     placeholder="CONTOH: MATEMATIKA - PAS GANJIL" 
                     required 
-                    className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-black outline-none focus:bg-white focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-600 transition-all uppercase placeholder:text-slate-300" 
+                    className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-black outline-none focus:bg-white focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-600 transition-all uppercase placeholder:text-slate-300 disabled:opacity-70" 
                   />
                 </div>
 
@@ -511,10 +517,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     <div className="relative">
                       <input 
                         name="pin" 
+                        disabled={isProcessing}
                         defaultValue={sessionToEdit?.pin} 
                         placeholder="PIN123" 
                         required 
-                        className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl text-center font-mono font-black text-indigo-600 outline-none focus:bg-white focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-600 transition-all uppercase placeholder:text-slate-300" 
+                        className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl text-center font-mono font-black text-indigo-600 outline-none focus:bg-white focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-600 transition-all uppercase placeholder:text-slate-300 disabled:opacity-70" 
                       />
                       <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300">
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -525,7 +532,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   </div>
                   <div className="space-y-2">
                     <label className="block text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] ml-1">Target Kelas</label>
-                    <select name="class" defaultValue={sessionToEdit?.class || "7"} className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-black focus:bg-white focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-600 outline-none transition-all appearance-none cursor-pointer">
+                    <select name="class" disabled={isProcessing} defaultValue={sessionToEdit?.class || "7"} className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-black focus:bg-white focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-600 outline-none transition-all appearance-none cursor-pointer disabled:opacity-70">
                         <option value="7">KELAS 7</option>
                         <option value="8">KELAS 8</option>
                         <option value="9">KELAS 9</option>
@@ -540,10 +547,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       <input 
                         name="duration" 
                         type="number" 
+                        disabled={isProcessing}
                         defaultValue={sessionToEdit?.durationMinutes || 60} 
                         required 
                         placeholder="MENIT" 
-                        className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-black outline-none focus:bg-white focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-600 transition-all placeholder:text-slate-300 pl-12" 
+                        className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-black outline-none focus:bg-white focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-600 transition-all placeholder:text-slate-300 pl-12 disabled:opacity-70" 
                       />
                       <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300">
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -568,9 +576,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   <div className="relative">
                     <input 
                       name="pdfUrl" 
+                      disabled={isProcessing}
                       defaultValue={sessionToEdit?.pdfUrl} 
                       placeholder="https://drive.google.com/..." 
-                      className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl text-[11px] font-medium outline-none focus:bg-white focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-600 transition-all placeholder:text-slate-300 pl-12" 
+                      className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl text-[11px] font-medium outline-none focus:bg-white focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-600 transition-all placeholder:text-slate-300 pl-12 disabled:opacity-70" 
                     />
                     <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300">
                       <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -583,12 +592,15 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 <div className="pt-6 flex flex-col gap-3">
                   <button 
                     type="submit" 
-                    className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-5 rounded-2xl font-black uppercase text-xs tracking-[0.2em] shadow-xl shadow-indigo-100 transition-all active:scale-[0.98]"
+                    disabled={isProcessing}
+                    className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white py-5 rounded-2xl font-black uppercase text-xs tracking-[0.2em] shadow-xl shadow-indigo-100 transition-all active:scale-[0.98] flex items-center justify-center gap-3"
                   >
-                    {sessionToEdit ? 'PERBARUI SESI' : 'SIMPAN SESI BARU'}
+                    {isProcessing && <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>}
+                    {isProcessing ? 'Menyimpan...' : (sessionToEdit ? 'PERBARUI SESI' : 'SIMPAN SESI BARU')}
                   </button>
                   <button 
                     type="button" 
+                    disabled={isProcessing}
                     onClick={() => { setShowAddSession(false); setSessionToEdit(null); }} 
                     className="w-full text-slate-400 font-black uppercase text-[10px] tracking-widest py-3 hover:text-red-500 transition-colors"
                   >
@@ -604,7 +616,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
       {(showAddRoom || roomToEdit) && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
           <div className="bg-white w-full max-w-lg p-10 rounded-[3rem] shadow-2xl animate-in zoom-in-95 overflow-hidden relative">
-            {/* Background design element */}
             <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-50 rounded-bl-[4rem] -mr-10 -mt-10 opacity-40"></div>
             
             <div className="relative z-10">
@@ -638,10 +649,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   <div className="relative">
                     <input 
                       name="name" 
+                      disabled={isProcessing}
                       defaultValue={roomToEdit?.name} 
                       placeholder="CONTOH: RUANG 01 / LAB KOMPUTER" 
                       required 
-                      className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-black outline-none focus:bg-white focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-600 transition-all uppercase placeholder:text-slate-300 pl-12" 
+                      className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-black outline-none focus:bg-white focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-600 transition-all uppercase placeholder:text-slate-300 pl-12 disabled:opacity-70" 
                     />
                     <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300">
                       <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -658,10 +670,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     <input 
                       name="capacity" 
                       type="number" 
+                      disabled={isProcessing}
                       defaultValue={roomToEdit?.capacity || 20} 
                       required 
                       placeholder="JUMLAH KURSI" 
-                      className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-black outline-none focus:bg-white focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-600 transition-all placeholder:text-slate-300 pl-12" 
+                      className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-black outline-none focus:bg-white focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-600 transition-all placeholder:text-slate-300 pl-12 disabled:opacity-70" 
                     />
                     <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300">
                       <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -680,20 +693,22 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       <label className="block text-[10px] font-black text-slate-500 uppercase ml-1">Username</label>
                       <input 
                         name="username" 
+                        disabled={isProcessing}
                         defaultValue={roomToEdit?.username} 
                         placeholder="proktor01" 
                         required 
-                        className="w-full px-5 py-3.5 bg-white border border-slate-100 rounded-xl text-xs font-bold outline-none focus:ring-4 focus:ring-emerald-500/10 transition-all" 
+                        className="w-full px-5 py-3.5 bg-white border border-slate-100 rounded-xl text-xs font-bold outline-none focus:ring-4 focus:ring-emerald-500/10 transition-all disabled:opacity-70" 
                       />
                     </div>
                     <div className="space-y-1.5">
                       <label className="block text-[10px] font-black text-slate-500 uppercase ml-1">Password</label>
                       <input 
                         name="password" 
+                        disabled={isProcessing}
                         defaultValue={roomToEdit?.password} 
                         placeholder="********" 
                         required 
-                        className="w-full px-5 py-3.5 bg-white border border-slate-100 rounded-xl text-xs font-bold outline-none focus:ring-4 focus:ring-emerald-500/10 transition-all" 
+                        className="w-full px-5 py-3.5 bg-white border border-slate-100 rounded-xl text-xs font-bold outline-none focus:ring-4 focus:ring-emerald-500/10 transition-all disabled:opacity-70" 
                       />
                     </div>
                   </div>
@@ -702,12 +717,15 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 <div className="pt-6 flex flex-col gap-3">
                   <button 
                     type="submit" 
-                    className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-5 rounded-2xl font-black uppercase text-xs tracking-[0.2em] shadow-xl shadow-emerald-100 transition-all active:scale-[0.98]"
+                    disabled={isProcessing}
+                    className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-400 text-white py-5 rounded-2xl font-black uppercase text-xs tracking-[0.2em] shadow-xl shadow-emerald-100 transition-all active:scale-[0.98] flex items-center justify-center gap-3"
                   >
-                    {roomToEdit ? 'PERBARUI RUANG' : 'SIMPAN RUANG BARU'}
+                    {isProcessing && <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>}
+                    {isProcessing ? 'Menyimpan...' : (roomToEdit ? 'PERBARUI RUANG' : 'SIMPAN RUANG BARU')}
                   </button>
                   <button 
                     type="button" 
+                    disabled={isProcessing}
                     onClick={() => { setShowAddRoom(false); setRoomToEdit(null); }} 
                     className="w-full text-slate-400 font-black uppercase text-[10px] tracking-widest py-3 hover:text-red-500 transition-colors"
                   >

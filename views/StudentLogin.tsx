@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { ExamSession, Student, StudentStatus } from '../types';
 
@@ -7,9 +6,10 @@ interface StudentLoginProps {
   students: Student[];
   onLogin: (student: Student, session: ExamSession) => void;
   onAdminClick: () => void;
+  isProcessing?: boolean;
 }
 
-const StudentLogin: React.FC<StudentLoginProps> = ({ sessions, students, onLogin, onAdminClick }) => {
+const StudentLogin: React.FC<StudentLoginProps> = ({ sessions, students, onLogin, onAdminClick, isProcessing = false }) => {
   const LOGO_URL = "https://www.alirsyad.or.id/wp-content/uploads/download/alirsyad-alislamiyyah-bw.png"; 
   
   const [formData, setFormData] = useState({
@@ -23,6 +23,7 @@ const StudentLogin: React.FC<StudentLoginProps> = ({ sessions, students, onLogin
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (isProcessing) return;
     setError('');
 
     const inputNis = String(formData.nis).trim();
@@ -83,7 +84,8 @@ const StudentLogin: React.FC<StudentLoginProps> = ({ sessions, students, onLogin
     <div className="relative flex flex-col items-center justify-center min-h-screen p-6 bg-slate-50">
       <button 
         onClick={onAdminClick}
-        className="absolute top-6 right-6 p-3 text-slate-400 hover:text-indigo-600 hover:bg-white hover:shadow-md rounded-full transition-all duration-300 group"
+        disabled={isProcessing}
+        className="absolute top-6 right-6 p-3 text-slate-400 hover:text-indigo-600 hover:bg-white hover:shadow-md rounded-full transition-all duration-300 group disabled:opacity-50"
         title="Portal Staff"
       >
         <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 group-hover:rotate-90 transition-transform duration-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -115,9 +117,10 @@ const StudentLogin: React.FC<StudentLoginProps> = ({ sessions, students, onLogin
             <input
               type="text"
               required
+              disabled={isProcessing}
               value={formData.nis}
               onChange={e => setFormData({...formData, nis: e.target.value})}
-              className="w-full px-6 py-4 rounded-2xl border border-slate-100 bg-slate-50 focus:bg-white focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all font-bold"
+              className="w-full px-6 py-4 rounded-2xl border border-slate-100 bg-slate-50 focus:bg-white focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all font-bold disabled:opacity-70"
               placeholder="Contoh: 1234"
             />
           </div>
@@ -128,9 +131,10 @@ const StudentLogin: React.FC<StudentLoginProps> = ({ sessions, students, onLogin
               <input
                 type={showPassword ? "text" : "password"}
                 required
+                disabled={isProcessing}
                 value={formData.password}
                 onChange={e => setFormData({...formData, password: e.target.value})}
-                className="w-full px-6 py-4 rounded-2xl border border-slate-100 bg-slate-50 focus:bg-white focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all font-bold pr-14"
+                className="w-full px-6 py-4 rounded-2xl border border-slate-100 bg-slate-50 focus:bg-white focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all font-bold pr-14 disabled:opacity-70"
                 placeholder="••••••••"
               />
               <button
@@ -157,9 +161,10 @@ const StudentLogin: React.FC<StudentLoginProps> = ({ sessions, students, onLogin
               <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Pilih Kelas</label>
               <select
                 required
+                disabled={isProcessing}
                 value={formData.studentClass}
                 onChange={e => setFormData({...formData, studentClass: e.target.value})}
-                className="w-full px-5 py-4 rounded-2xl border border-slate-100 bg-slate-50 focus:bg-white focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all font-bold appearance-none"
+                className="w-full px-5 py-4 rounded-2xl border border-slate-100 bg-slate-50 focus:bg-white focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all font-bold appearance-none disabled:opacity-70"
               >
                 <option value="">Kelas</option>
                 <option value="7">Kls 7</option>
@@ -172,9 +177,10 @@ const StudentLogin: React.FC<StudentLoginProps> = ({ sessions, students, onLogin
               <input
                 type="text"
                 required
+                disabled={isProcessing}
                 value={formData.pin}
                 onChange={e => setFormData({...formData, pin: e.target.value})}
-                className="w-full px-5 py-4 rounded-2xl border border-slate-100 bg-slate-50 focus:bg-white focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all text-center tracking-widest font-mono font-black uppercase"
+                className="w-full px-5 py-4 rounded-2xl border border-slate-100 bg-slate-50 focus:bg-white focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all text-center tracking-widest font-mono font-black uppercase disabled:opacity-70"
                 placeholder="PIN"
               />
             </div>
@@ -191,9 +197,13 @@ const StudentLogin: React.FC<StudentLoginProps> = ({ sessions, students, onLogin
 
           <button
             type="submit"
-            className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-black py-5 rounded-2xl shadow-xl shadow-indigo-100 transition-all active:scale-[0.98] mt-4 uppercase text-xs tracking-widest"
+            disabled={isProcessing}
+            className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white font-black py-5 rounded-2xl shadow-xl shadow-indigo-100 transition-all active:scale-[0.98] mt-4 uppercase text-xs tracking-widest flex items-center justify-center gap-3"
           >
-            Mulai Ujian
+            {isProcessing && (
+              <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+            )}
+            {isProcessing ? 'Memproses...' : 'Mulai Ujian'}
           </button>
         </form>
       </div>

@@ -1,4 +1,3 @@
-
 import React, { useMemo, useState } from 'react';
 import { Student, StudentStatus, Room } from '../types';
 
@@ -7,12 +6,13 @@ interface ProctorDashboardProps {
   room: Room;
   students: Student[];
   isSyncing: boolean;
+  isProcessing?: boolean;
   onLogout: () => void;
   onAction: (action: string, payload: any) => Promise<boolean>;
 }
 
 const ProctorDashboard: React.FC<ProctorDashboardProps> = ({ 
-  room, students, isSyncing: globalSyncing, onLogout, onAction 
+  room, students, isSyncing: globalSyncing, isProcessing = false, onLogout, onAction 
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
@@ -31,13 +31,13 @@ const ProctorDashboard: React.FC<ProctorDashboardProps> = ({
     });
   }, [students, room.id, searchTerm]);
 
-  const handleSaveStatus = () => {
+  const handleSaveStatus = async () => {
     if (selectedStudent && pendingStatus) {
-      // Jalankan aksi di background
-      onAction('UPDATE_STUDENT', { ...selectedStudent, status: pendingStatus });
-      // Tutup modal secara instan (Optimistic)
-      setSelectedStudent(null);
-      setPendingStatus(null);
+      const ok = await onAction('UPDATE_STUDENT', { ...selectedStudent, status: pendingStatus });
+      if (ok) {
+        setSelectedStudent(null);
+        setPendingStatus(null);
+      }
     }
   };
 
@@ -64,14 +64,13 @@ const ProctorDashboard: React.FC<ProctorDashboardProps> = ({
            </div>
         </div>
         <div className="flex items-center gap-3 md:gap-6 shrink-0">
-          {globalSyncing && <div className="w-3.5 h-3.5 md:w-4 md:h-4 border-2 border-indigo-400/30 border-t-white rounded-full animate-spin"></div>}
+          {(globalSyncing || isProcessing) && <div className="w-3.5 h-3.5 md:w-4 md:h-4 border-2 border-indigo-400/30 border-t-white rounded-full animate-spin"></div>}
           <button onClick={onLogout} className="text-indigo-200 hover:text-white font-black text-[10px] md:text-sm uppercase tracking-widest transition-colors">Keluar</button>
         </div>
       </header>
 
       <main className="flex-1 overflow-auto p-4 md:p-10 bg-[#f8fafc]">
         <div className="max-w-6xl mx-auto">
-          {/* SEARCH & TITLE SECTION */}
           <div className="mb-6 md:mb-10 flex flex-col md:flex-row justify-between items-start md:items-end gap-5">
             <div>
               <h2 className="text-xl md:text-3xl font-black text-slate-900 uppercase tracking-tighter leading-none">Status Peserta</h2>
@@ -179,11 +178,12 @@ const ProctorDashboard: React.FC<ProctorDashboardProps> = ({
               {[StudentStatus.BELUM_MASUK, StudentStatus.SEDANG_UJIAN, StudentStatus.SELESAI, StudentStatus.BLOKIR].map(status => (
                 <button
                   key={status}
+                  disabled={isProcessing}
                   onClick={() => setPendingStatus(status)}
                   className={`w-full py-4 rounded-2xl border-2 font-black text-[10px] md:text-[11px] uppercase tracking-widest transition-all duration-300 ${
                     pendingStatus === status 
                     ? 'bg-emerald-600 border-emerald-600 text-white shadow-xl shadow-emerald-100' 
-                    : 'bg-slate-50 border-slate-50 text-slate-400 hover:border-slate-200'
+                    : 'bg-slate-50 border-slate-50 text-slate-400 hover:border-slate-200 disabled:opacity-50'
                   }`}
                 >
                   {status.replace('_', ' ')}
@@ -194,16 +194,22 @@ const ProctorDashboard: React.FC<ProctorDashboardProps> = ({
             <div className="flex flex-col gap-2">
               <button 
                 onClick={handleSaveStatus} 
-                className="group w-full bg-gradient-to-r from-indigo-600 to-indigo-700 text-white py-4 md:py-5 rounded-2xl font-black text-xs uppercase tracking-[0.2em] shadow-xl shadow-indigo-500/25 flex items-center justify-center gap-3 active:scale-95 transition-all duration-300"
+                disabled={isProcessing}
+                className="group w-full bg-gradient-to-r from-indigo-600 to-indigo-700 disabled:from-slate-400 disabled:to-slate-500 text-white py-4 md:py-5 rounded-2xl font-black text-xs uppercase tracking-[0.2em] shadow-xl shadow-indigo-500/25 flex items-center justify-center gap-3 active:scale-95 transition-all duration-300"
               >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                </svg>
-                SIMPAN PERUBAHAN
+                {isProcessing ? (
+                  <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                ) : (
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                  </svg>
+                )}
+                {isProcessing ? 'MEMPROSES...' : 'SIMPAN PERUBAHAN'}
               </button>
               <button 
                 onClick={() => setSelectedStudent(null)} 
-                className="w-full py-3 text-slate-400 font-bold text-[10px] uppercase tracking-widest hover:text-red-500 transition-colors"
+                disabled={isProcessing}
+                className="w-full py-3 text-slate-400 font-bold text-[10px] uppercase tracking-widest hover:text-red-500 transition-colors disabled:opacity-50"
               >
                 Batal
               </button>

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, Suspense, lazy } from 'react';
 import { ViewState, Student, ExamSession, StudentStatus, Room } from './types';
 import { fetchFromCloud, callCloudAction } from './services/databaseService';
@@ -18,7 +17,7 @@ const App: React.FC = () => {
   const [activeRoom, setActiveRoom] = useState<Room | null>(null);
   
   const [isLoading, setIsLoading] = useState(true);
-  const [isSyncing, setIsSyncing] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false); 
   const [hasError, setHasError] = useState(false);
   const [errorDetail, setErrorDetail] = useState('');
 
@@ -28,8 +27,6 @@ const App: React.FC = () => {
 
   const loadAllData = async () => {
     if (!GAS_URL) return;
-    
-    setIsSyncing(true);
     const cloudData = await fetchFromCloud(GAS_URL);
     
     if (cloudData) {
@@ -48,10 +45,9 @@ const App: React.FC = () => {
         setRooms(parsed.rooms || []);
       }
       setHasError(true);
-      setErrorDetail('Gagal terhubung ke Cloud. Pastikan internet aktif.');
+      setErrorDetail('Gagal terhubung ke Cloud.');
     }
     setIsLoading(false);
-    setIsSyncing(false);
   };
 
   useEffect(() => {
@@ -64,67 +60,54 @@ const App: React.FC = () => {
   }, [view]);
 
   const handleAction = async (action: string, payload: any) => {
-    // Optimistic Update: Langsung update state lokal agar UI terasa instan
+    setIsProcessing(true);
+
     if (action === 'UPDATE_STUDENT') {
       setStudents(prev => prev.map(s => 
         String(s.nis) === String(payload.nis) ? { ...s, ...payload } : s
       ));
     }
 
-    setIsSyncing(true);
     const success = await callCloudAction(GAS_URL, action, payload);
+    if (success) await loadAllData();
     
-    // Refresh data untuk memastikan state tetap akurat dengan server
-    if (success) {
-      await loadAllData();
-    } else {
-      // Revert/Refresh jika gagal
-      await loadAllData();
-    }
-    
-    setIsSyncing(false);
+    setIsProcessing(false);
     return success;
   };
 
   const handleStudentLogin = async (student: Student, session: ExamSession) => {
-    setCurrentUser(student);
-    setCurrentSession(session);
-    await handleAction('UPDATE_STUDENT', { ...student, status: StudentStatus.SEDANG_UJIAN });
-    setView('EXAM_ROOM');
+    setIsProcessing(true);
+    const success = await handleAction('UPDATE_STUDENT', { ...student, status: StudentStatus.SEDANG_UJIAN });
+    if (success) {
+      setCurrentUser(student);
+      setCurrentSession(session);
+      setView('EXAM_ROOM');
+    }
+    setIsProcessing(false);
   };
 
   if (isLoading) {
     return (
       <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-10 text-center">
-        <div className="w-12 h-12 border-4 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin mb-6"></div>
-        <h2 className="text-white font-black uppercase tracking-widest text-[10px]">Menghubungkan ke Database...</h2>
-        {hasError && <p className="text-red-400 text-[10px] mt-4 font-bold">{errorDetail}</p>}
-        {hasError && (
-          <button 
-            onClick={() => { setIsLoading(true); loadAllData(); }} 
-            className="mt-6 bg-white/10 text-white px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest"
-          >
-            Coba Lagi
-          </button>
-        )}
+        <div className="w-10 h-10 border-4 border-white/10 border-t-indigo-500 rounded-full animate-spin mb-6"></div>
+        <h2 className="text-white font-black uppercase tracking-widest text-[10px]">Menyiapkan Sistem...</h2>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 overflow-x-hidden">
+    <div className="min-h-screen bg-slate-50 overflow-x-hidden relative">
       {hasError && (
-        <div className="fixed top-0 left-0 right-0 z-[9999] bg-red-600 text-white py-2 px-4 text-center text-[10px] font-black uppercase tracking-widest animate-in slide-in-from-top duration-500">
-          ⚠️ Masalah Koneksi. Menggunakan Data Terakhir.
-          <button onClick={() => loadAllData()} className="ml-4 underline">Segarkan</button>
+        <div className="fixed top-0 left-0 right-0 z-[9999] bg-red-600 text-white py-2 px-4 text-center text-[10px] font-black uppercase tracking-widest">
+          ⚠️ Masalah Koneksi. Menggunakan Data Lokal.
         </div>
       )}
       
-      <Suspense fallback={<div className="min-h-screen flex items-center justify-center bg-slate-50"><div className="w-8 h-8 border-3 border-indigo-500/10 border-t-indigo-500 rounded-full animate-spin"></div></div>}>
-        {view === 'STUDENT_LOGIN' && <StudentLogin sessions={sessions} students={students} onLogin={handleStudentLogin} onAdminClick={() => setView('ADMIN_LOGIN')} />}
+      <Suspense fallback={<div className="min-h-screen flex items-center justify-center bg-slate-50"></div>}>
+        {view === 'STUDENT_LOGIN' && <StudentLogin sessions={sessions} students={students} onLogin={handleStudentLogin} onAdminClick={() => setView('ADMIN_LOGIN')} isProcessing={isProcessing} />}
         {view === 'ADMIN_LOGIN' && <AdminLogin rooms={rooms} onLogin={(role, r) => { if(role==='ADMIN') setView('ADMIN_DASHBOARD'); else { setActiveRoom(r!); setView('PROCTOR_DASHBOARD'); } }} onBack={() => setView('STUDENT_LOGIN')} />}
-        {view === 'ADMIN_DASHBOARD' && <AdminDashboard sessions={sessions} students={students} rooms={rooms} isSyncing={isSyncing} onLogout={() => setView('STUDENT_LOGIN')} onAction={handleAction} />}
-        {view === 'PROCTOR_DASHBOARD' && activeRoom && <ProctorDashboard room={activeRoom} students={students} isSyncing={isSyncing} onLogout={() => setView('STUDENT_LOGIN')} onAction={handleAction} gasUrl={GAS_URL} />}
+        {view === 'ADMIN_DASHBOARD' && <AdminDashboard sessions={sessions} students={students} rooms={rooms} isSyncing={false} isProcessing={isProcessing} onLogout={() => setView('STUDENT_LOGIN')} onAction={handleAction} />}
+        {view === 'PROCTOR_DASHBOARD' && activeRoom && <ProctorDashboard room={activeRoom} students={students} isSyncing={false} isProcessing={isProcessing} onLogout={() => setView('STUDENT_LOGIN')} onAction={handleAction} gasUrl={GAS_URL} />}
         {view === 'EXAM_ROOM' && currentUser && currentSession && <ExamRoom student={currentUser} students={students} session={currentSession} onFinish={() => { setCurrentUser(null); setCurrentSession(null); setView('STUDENT_LOGIN'); }} />}
       </Suspense>
     </div>
