@@ -81,22 +81,22 @@ const StudentLogin: React.FC<StudentLoginProps> = ({ sessions, students, onLogin
   };
 
   return (
-    <div className="relative flex flex-col items-center justify-center min-h-screen p-6 bg-slate-50">
+    <div className="relative flex flex-col items-center justify-center min-h-screen p-4 bg-slate-50">
       <button 
         onClick={onAdminClick}
         disabled={isProcessing}
-        className="absolute top-6 right-6 p-3 text-slate-400 hover:text-indigo-600 hover:bg-white hover:shadow-md rounded-full transition-all duration-300 group disabled:opacity-50"
+        className="absolute top-4 right-4 p-2.5 text-slate-400 hover:text-indigo-600 hover:bg-white hover:shadow-md rounded-full transition-all duration-300 group disabled:opacity-50"
         title="Portal Staff"
       >
-        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 group-hover:rotate-90 transition-transform duration-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 group-hover:rotate-90 transition-transform duration-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
         </svg>
       </button>
 
-      <div className="w-full max-w-md bg-white p-10 rounded-[2.5rem] shadow-2xl shadow-slate-200/50 border border-slate-100">
-        <div className="text-center mb-10 flex flex-col items-center">
-          <div className="mb-6 w-24 h-24 bg-white rounded-3xl flex items-center justify-center border border-slate-100 shadow-sm overflow-hidden p-2">
+      <div className="w-full max-w-[380px] bg-white p-7 md:p-10 rounded-[2rem] shadow-2xl shadow-slate-200/50 border border-slate-100">
+        <div className="text-center mb-8 flex flex-col items-center">
+          <div className="mb-4 w-20 h-20 bg-white rounded-2xl flex items-center justify-center border border-slate-100 shadow-sm overflow-hidden p-2">
             <img 
               src={LOGO_URL} 
               alt="Logo" 
@@ -105,28 +105,28 @@ const StudentLogin: React.FC<StudentLoginProps> = ({ sessions, students, onLogin
             />
           </div>
           
-          <h1 className="text-2xl md:text-3xl font-black text-indigo-600 mb-1 tracking-tighter uppercase drop-shadow-sm">
+          <h1 className="text-xl md:text-2xl font-black text-indigo-600 mb-0.5 tracking-tighter uppercase drop-shadow-sm">
             EXAM SEMI-ONLINE
           </h1>
-          <p className="text-slate-400 text-[10px] font-black uppercase tracking-[0.2em]">SMP Al Irsyad Surakarta</p>
+          <p className="text-slate-400 text-[9px] font-black uppercase tracking-[0.2em]">SMP Al Irsyad Surakarta</p>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-1.5">
-            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Nomor Induk Siswa</label>
+        <form onSubmit={handleSubmit} className="space-y-3.5">
+          <div className="space-y-1">
+            <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Nomor Induk Siswa</label>
             <input
               type="text"
               required
               disabled={isProcessing}
               value={formData.nis}
               onChange={e => setFormData({...formData, nis: e.target.value})}
-              className="w-full px-6 py-4 rounded-2xl border border-slate-100 bg-slate-50 focus:bg-white focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all font-bold disabled:opacity-70"
+              className="w-full px-4 py-3 rounded-xl border border-slate-100 bg-slate-50 focus:bg-white focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all font-bold disabled:opacity-70 text-sm"
               placeholder="Contoh: 1234"
             />
           </div>
 
-          <div className="space-y-1.5">
-            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Password</label>
+          <div className="space-y-1">
+            <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Password</label>
             <div className="relative">
               <input
                 type={showPassword ? "text" : "password"}
@@ -134,20 +134,20 @@ const StudentLogin: React.FC<StudentLoginProps> = ({ sessions, students, onLogin
                 disabled={isProcessing}
                 value={formData.password}
                 onChange={e => setFormData({...formData, password: e.target.value})}
-                className="w-full px-6 py-4 rounded-2xl border border-slate-100 bg-slate-50 focus:bg-white focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all font-bold pr-14 disabled:opacity-70"
+                className="w-full px-4 py-3 rounded-xl border border-slate-100 bg-slate-50 focus:bg-white focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all font-bold pr-12 disabled:opacity-70 text-sm"
                 placeholder="••••••••"
               />
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-4 top-1/2 -translate-y-1/2 p-2 text-slate-400 hover:text-indigo-600 transition-colors"
+                className="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 text-slate-400 hover:text-indigo-600 transition-colors"
               >
                 {showPassword ? (
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l18 18" />
                   </svg>
                 ) : (
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268-2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                   </svg>
@@ -156,15 +156,15 @@ const StudentLogin: React.FC<StudentLoginProps> = ({ sessions, students, onLogin
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Pilih Kelas</label>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Pilih Kelas</label>
               <select
                 required
                 disabled={isProcessing}
                 value={formData.studentClass}
                 onChange={e => setFormData({...formData, studentClass: e.target.value})}
-                className="w-full px-5 py-4 rounded-2xl border border-slate-100 bg-slate-50 focus:bg-white focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all font-bold appearance-none disabled:opacity-70"
+                className="w-full px-3 py-3 rounded-xl border border-slate-100 bg-slate-50 focus:bg-white focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all font-bold appearance-none disabled:opacity-70 text-sm"
               >
                 <option value="">Kelas</option>
                 <option value="7">Kls 7</option>
@@ -172,23 +172,23 @@ const StudentLogin: React.FC<StudentLoginProps> = ({ sessions, students, onLogin
                 <option value="9">Kls 9</option>
               </select>
             </div>
-            <div className="space-y-1.5">
-              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">PIN Sesi</label>
+            <div className="space-y-1">
+              <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">PIN Sesi</label>
               <input
                 type="text"
                 required
                 disabled={isProcessing}
                 value={formData.pin}
                 onChange={e => setFormData({...formData, pin: e.target.value})}
-                className="w-full px-5 py-4 rounded-2xl border border-slate-100 bg-slate-50 focus:bg-white focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all text-center tracking-widest font-mono font-black uppercase disabled:opacity-70"
+                className="w-full px-3 py-3 rounded-xl border border-slate-100 bg-slate-50 focus:bg-white focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all text-center tracking-widest font-mono font-black uppercase disabled:opacity-70 text-sm"
                 placeholder="PIN"
               />
             </div>
           </div>
 
           {error && (
-            <div className="flex items-center gap-3 text-red-600 text-[11px] font-bold bg-red-50 p-4 rounded-2xl border border-red-100 animate-in slide-in-from-top-2">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 shrink-0" viewBox="0 0 20 20" fill="currentColor">
+            <div className="flex items-center gap-2 text-red-600 text-[10px] font-bold bg-red-50 p-3 rounded-xl border border-red-100 animate-in slide-in-from-top-2">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 shrink-0" viewBox="0 0 20 20" fill="currentColor">
                 <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
               </svg>
               {error}
@@ -198,17 +198,17 @@ const StudentLogin: React.FC<StudentLoginProps> = ({ sessions, students, onLogin
           <button
             type="submit"
             disabled={isProcessing}
-            className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white font-black py-5 rounded-2xl shadow-xl shadow-indigo-100 transition-all active:scale-[0.98] mt-4 uppercase text-xs tracking-widest flex items-center justify-center gap-3"
+            className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white font-black py-4 rounded-xl shadow-lg shadow-indigo-100 transition-all active:scale-[0.98] mt-2 uppercase text-[11px] tracking-widest flex items-center justify-center gap-2"
           >
             {isProcessing && (
-              <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+              <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
             )}
             {isProcessing ? 'Memproses...' : 'Mulai Ujian'}
           </button>
         </form>
       </div>
 
-      <footer className="mt-10 text-slate-400 text-[10px] font-black uppercase tracking-widest">
+      <footer className="mt-8 text-slate-400 text-[9px] font-black uppercase tracking-widest text-center">
         &copy; 2026 HUMAS SMP AL IRSYAD SURAKARTA
       </footer>
     </div>
